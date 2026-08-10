@@ -183,7 +183,12 @@ function findCandidateMenus() {
 }
 
 function findStatusSummaryItems() {
-  return Array.from(document.querySelectorAll('[role="menuitem"], button, [class*="item"]'))
+  const candidates = [
+    ...document.querySelectorAll('[role="menuitem"], button, [class*="item"]'),
+    ...document.querySelectorAll("div, span")
+  ];
+
+  return Array.from(new Set(candidates))
     .filter((node) => node instanceof HTMLElement)
     .filter((node) => !node.closest(".awaytimer-native-menu-group"))
     .filter((node) => !node.classList.contains("awaytimer-native-menu-item"))
@@ -193,8 +198,14 @@ function findStatusSummaryItems() {
     .filter((node) => {
       const text = normalizeText(node.textContent);
       if (isNativeDurationLabel(text)) return false;
-      return ["idle", "dnd", "invisible"].includes(statusKindFromText(text));
+      if (!["idle", "dnd", "invisible"].includes(statusKindFromText(text))) return false;
+      return isCompactStatusLabel(node);
     });
+}
+
+function isCompactStatusLabel(node) {
+  const text = normalizeText(node.textContent).replace(/\s*Until \d{1,2}:\d{2}\s?[AP]M$/i, "").trim();
+  return ["Idle", "Do Not Disturb", "Invisible"].includes(text);
 }
 
 function isInAccountStatusPopout(node) {

@@ -2,7 +2,7 @@
  * @name StatusTimer
  * @author ctrlcmdshft
  * @description Custom duration presets for Discord status timers.
- * @version 0.9.8
+ * @version 0.9.9
  */
 var __getOwnPropNames = Object.getOwnPropertyNames;
 var __commonJS = (cb, mod) => function __require() {
@@ -357,11 +357,20 @@ var require_menuInjector = __commonJS({
       return Array.from(document.querySelectorAll('[role="menu"]')).filter((node) => node instanceof HTMLElement).filter((node) => !node.closest(".awaytimer-native-menu-group"));
     }
     function findStatusSummaryItems() {
-      return Array.from(document.querySelectorAll('[role="menuitem"], button, [class*="item"]')).filter((node) => node instanceof HTMLElement).filter((node) => !node.closest(".awaytimer-native-menu-group")).filter((node) => !node.classList.contains("awaytimer-native-menu-item")).filter((node) => !node.classList.contains("awaytimer-hidden-native-menu-item")).filter((node) => isInAccountStatusPopout(node)).filter((node) => !isStatusChoiceMenu(node.closest('[role="menu"]'))).filter((node) => {
+      const candidates = [
+        ...document.querySelectorAll('[role="menuitem"], button, [class*="item"]'),
+        ...document.querySelectorAll("div, span")
+      ];
+      return Array.from(new Set(candidates)).filter((node) => node instanceof HTMLElement).filter((node) => !node.closest(".awaytimer-native-menu-group")).filter((node) => !node.classList.contains("awaytimer-native-menu-item")).filter((node) => !node.classList.contains("awaytimer-hidden-native-menu-item")).filter((node) => isInAccountStatusPopout(node)).filter((node) => !isStatusChoiceMenu(node.closest('[role="menu"]'))).filter((node) => {
         const text = normalizeText(node.textContent);
         if (isNativeDurationLabel(text)) return false;
-        return ["idle", "dnd", "invisible"].includes(statusKindFromText(text));
+        if (!["idle", "dnd", "invisible"].includes(statusKindFromText(text))) return false;
+        return isCompactStatusLabel(node);
       });
+    }
+    function isCompactStatusLabel(node) {
+      const text = normalizeText(node.textContent).replace(/\s*Until \d{1,2}:\d{2}\s?[AP]M$/i, "").trim();
+      return ["Idle", "Do Not Disturb", "Invisible"].includes(text);
     }
     function isInAccountStatusPopout(node) {
       let current = node.parentElement;
