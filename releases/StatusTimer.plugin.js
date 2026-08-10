@@ -2,7 +2,7 @@
  * @name StatusTimer
  * @author ctrlcmdshft
  * @description Custom duration presets for Discord status timers.
- * @version 1.0.1
+ * @version 1.0.2
  */
 var __getOwnPropNames = Object.getOwnPropertyNames;
 var __commonJS = (cb, mod) => function __require() {
@@ -246,6 +246,7 @@ var require_menuInjector = __commonJS({
         this.pending = true;
         requestAnimationFrame(() => {
           this.pending = false;
+          this.decorateStatusChoiceMenu();
           this.injectIntoDurationMenus();
         });
       }
@@ -269,6 +270,22 @@ var require_menuInjector = __commonJS({
             item.classList.add("awaytimer-hidden-native-menu-item");
             item.hidden = true;
           }
+        }
+      }
+      decorateStatusChoiceMenu() {
+        const activeSubtitles = /* @__PURE__ */ new Set();
+        for (const item of findStatusChoiceItems()) {
+          const statusKind = statusKindFromText(normalizeText(item.textContent));
+          if (!["idle", "dnd", "invisible"].includes(statusKind)) continue;
+          const activeTimer = this.manualTimer.getActiveTimer(statusKind);
+          if (!activeTimer) continue;
+          const label = `Until ${formatClockTime(activeTimer.expiresAt)}`;
+          const subtitle = ensureStatusSubtitle(item);
+          if (subtitle.textContent !== label) subtitle.textContent = label;
+          activeSubtitles.add(subtitle);
+        }
+        for (const subtitle of document.querySelectorAll(".awaytimer-parent-subtitle")) {
+          if (!activeSubtitles.has(subtitle)) subtitle.remove();
         }
       }
       createMenuGroup(templateItem, statusKind) {
@@ -338,6 +355,38 @@ var require_menuInjector = __commonJS({
     }
     function findCandidateMenus() {
       return Array.from(document.querySelectorAll('[role="menu"]')).filter((node) => node instanceof HTMLElement).filter((node) => !node.closest(".awaytimer-native-menu-group"));
+    }
+    function findStatusChoiceItems() {
+      return Array.from(document.querySelectorAll('[role="menu"]')).filter((menu) => menu instanceof HTMLElement).filter(isStatusChoiceMenu).flatMap((menu) => Array.from(menu.querySelectorAll('[role="menuitem"], button'))).filter((node) => node instanceof HTMLElement).filter((node) => !node.closest(".awaytimer-native-menu-group")).filter((node) => !node.classList.contains("awaytimer-native-menu-item")).filter((node) => !node.classList.contains("awaytimer-hidden-native-menu-item")).filter((node) => ["idle", "dnd", "invisible"].includes(statusKindFromText(normalizeText(node.textContent))));
+    }
+    function isStatusChoiceMenu(menu) {
+      const labels = new Set(
+        Array.from(menu.querySelectorAll('[role="menuitem"], button')).map((node) => statusKindFromText(normalizeText(node.textContent))).filter(Boolean)
+      );
+      return labels.has("idle") && labels.has("dnd") && labels.has("invisible");
+    }
+    function ensureStatusSubtitle(item) {
+      const existing = item.querySelector(".awaytimer-parent-subtitle");
+      if (existing) return existing;
+      const subtitle = document.createElement("div");
+      subtitle.className = "awaytimer-parent-subtitle";
+      subtitle.style.color = "var(--text-muted)";
+      subtitle.style.fontSize = "12px";
+      subtitle.style.lineHeight = "16px";
+      subtitle.style.fontWeight = "500";
+      const textContainer = findStatusTextContainer(item);
+      textContainer.append(subtitle);
+      return subtitle;
+    }
+    function findStatusTextContainer(item) {
+      const textNode = getTextNodes(item).find((node) => ["idle", "dnd", "invisible"].includes(statusKindFromText(normalizeText(node.textContent))));
+      return textNode?.parentElement && textNode.parentElement !== item ? textNode.parentElement : item;
+    }
+    function getTextNodes(node) {
+      const walker = document.createTreeWalker(node, NodeFilter.SHOW_TEXT);
+      const textNodes = [];
+      while (walker.nextNode()) textNodes.push(walker.currentNode);
+      return textNodes;
     }
     function removeParentStatusSubtitles() {
       for (const node of document.querySelectorAll(".awaytimer-parent-subtitle")) {
