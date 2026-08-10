@@ -29,7 +29,7 @@ class ManualStatusTimer {
       return false;
     }
 
-    if (!this.statusAdapter.updateStatus(status)) return false;
+    if (!this.statusAdapter.updateStatus(status, {expiresAt})) return false;
     BdApi.Data.save(PLUGIN_NAME, ACTIVE_TIMER_KEY, {
       expiresAt,
       status,
@@ -73,7 +73,7 @@ class ManualStatusTimer {
     this.clearTimer();
     BdApi.Data.delete?.(PLUGIN_NAME, ACTIVE_TIMER_KEY);
     BdApi.Data.delete?.(LEGACY_PLUGIN_NAME, ACTIVE_TIMER_KEY);
-    if (!this.statusAdapter.updateStatus(status)) return false;
+    if (!this.statusAdapter.updateStatus(status, {expiresAt: null})) return false;
     this.notify(`${humanStatus(status)} forever.`);
     return true;
   }
@@ -96,7 +96,7 @@ class ManualStatusTimer {
     BdApi.Data.delete?.(PLUGIN_NAME, ACTIVE_TIMER_KEY);
     BdApi.Data.delete?.(LEGACY_PLUGIN_NAME, ACTIVE_TIMER_KEY);
     if (restore && active?.previousStatus && this.statusAdapter.currentStatus() === active.status) {
-      this.statusAdapter.updateStatus(active.previousStatus);
+      this.statusAdapter.updateStatus(active.previousStatus, {expiresAt: null});
     }
     this.notify("StatusTimer manual timer cancelled.");
   }
@@ -139,7 +139,7 @@ class ManualStatusTimer {
     const timerStatus = timerData?.status || "idle";
     if (!restoreStatus || this.statusAdapter.currentStatus() !== timerStatus) return;
 
-    if (this.statusAdapter.updateStatus(restoreStatus)) {
+    if (this.statusAdapter.updateStatus(restoreStatus, {expiresAt: null})) {
       this.notify(`StatusTimer restored ${humanStatus(restoreStatus)}.`);
     }
   }

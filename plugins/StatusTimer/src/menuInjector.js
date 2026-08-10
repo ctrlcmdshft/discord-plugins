@@ -52,7 +52,6 @@ class MenuInjector {
     this.pending = true;
     requestAnimationFrame(() => {
       this.pending = false;
-      this.decorateParentStatusItems();
       this.injectIntoDurationMenus();
     });
   }
@@ -78,27 +77,6 @@ class MenuInjector {
         item.classList.add("awaytimer-hidden-native-menu-item");
         item.hidden = true;
       }
-    }
-  }
-
-  decorateParentStatusItems() {
-    const activeSubtitles = new Set();
-
-    for (const item of findStatusSummaryItems()) {
-      const statusKind = statusKindFromText(normalizeText(item.textContent));
-      if (!["idle", "dnd", "invisible"].includes(statusKind)) continue;
-
-      const activeTimer = this.manualTimer.getActiveTimer(statusKind);
-      if (!activeTimer) continue;
-
-      const label = `Until ${formatClockTime(activeTimer.expiresAt)}`;
-      const subtitle = ensureParentStatusSubtitle(item);
-      if (subtitle.textContent !== label) subtitle.textContent = label;
-      activeSubtitles.add(subtitle);
-    }
-
-    for (const subtitle of document.querySelectorAll(".awaytimer-parent-subtitle")) {
-      if (!activeSubtitles.has(subtitle)) subtitle.remove();
     }
   }
 
@@ -180,93 +158,6 @@ function findCandidateMenus() {
   return Array.from(document.querySelectorAll('[role="menu"]'))
     .filter((node) => node instanceof HTMLElement)
     .filter((node) => !node.closest(".awaytimer-native-menu-group"));
-}
-
-function findStatusSummaryItems() {
-  const candidates = [
-    ...document.querySelectorAll('[role="menuitem"], button, [class*="item"]'),
-    ...document.querySelectorAll("div, span")
-  ];
-
-  return Array.from(new Set(candidates))
-    .filter((node) => node instanceof HTMLElement)
-    .filter((node) => !node.closest(".awaytimer-native-menu-group"))
-    .filter((node) => !node.classList.contains("awaytimer-native-menu-item"))
-    .filter((node) => !node.classList.contains("awaytimer-hidden-native-menu-item"))
-    .filter((node) => isInAccountStatusPopout(node))
-    .filter((node) => !isStatusChoiceMenu(node.closest('[role="menu"]')))
-    .filter((node) => {
-      const text = normalizeText(node.textContent);
-      if (isNativeDurationLabel(text)) return false;
-      if (!["idle", "dnd", "invisible"].includes(statusKindFromText(text))) return false;
-      return isCompactStatusLabel(node);
-    });
-}
-
-function isCompactStatusLabel(node) {
-  const text = normalizeText(node.textContent).replace(/\s*Until \d{1,2}:\d{2}\s?[AP]M$/i, "").trim();
-  return ["Idle", "Do Not Disturb", "Invisible"].includes(text);
-}
-
-function isInAccountStatusPopout(node) {
-  let current = node.parentElement;
-  let depth = 0;
-
-  while (current && current !== document.body && depth < 10) {
-    const text = normalizeText(current.textContent);
-    if (text.includes("Edit Profile") && text.includes("Clips")) return true;
-    current = current.parentElement;
-    depth += 1;
-  }
-
-  return false;
-}
-
-function isStatusChoiceMenu(menu) {
-  if (!(menu instanceof HTMLElement)) return false;
-  const labels = new Set(
-    Array.from(menu.querySelectorAll('[role="menuitem"], button'))
-      .map((node) => statusKindFromText(normalizeText(node.textContent)))
-      .filter(Boolean)
-  );
-  return labels.has("idle") && labels.has("dnd") && labels.has("invisible");
-}
-
-function ensureParentStatusSubtitle(item) {
-  const existing = item.querySelector(".awaytimer-parent-subtitle");
-  if (existing) return existing;
-
-  const subtitle = document.createElement("div");
-  subtitle.className = "awaytimer-parent-subtitle";
-  subtitle.style.color = "var(--text-muted)";
-  subtitle.style.fontSize = "12px";
-  subtitle.style.lineHeight = "16px";
-  subtitle.style.fontWeight = "500";
-
-  const textContainer = findStatusTextContainer(item);
-  textContainer.append(subtitle);
-  return subtitle;
-}
-
-function findStatusTextContainer(item) {
-  const textNodes = getTextNodes(item)
-    .filter((node) => ["idle", "dnd", "invisible"].includes(statusKindFromText(normalizeText(node.textContent))));
-  const textNode = textNodes[0];
-  const parent = textNode?.parentElement;
-  if (!parent || parent === item) return item;
-
-  let current = parent;
-  while (current.parentElement && current.parentElement !== item && normalizeText(current.parentElement.textContent) === normalizeText(parent.textContent)) {
-    current = current.parentElement;
-  }
-  return current;
-}
-
-function getTextNodes(node) {
-  const walker = document.createTreeWalker(node, NodeFilter.SHOW_TEXT);
-  const textNodes = [];
-  while (walker.nextNode()) textNodes.push(walker.currentNode);
-  return textNodes;
 }
 
 function removeParentStatusSubtitles() {
