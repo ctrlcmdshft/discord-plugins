@@ -5,6 +5,7 @@ AwayTimer is a focused BetterDiscord plugin that lets you choose when Discord sh
 ## What v0.3 Includes
 
 - Custom manual Idle timer presets, defaulting to 20 minutes, 45 minutes, 2 hours, 4 hours, and 24 hours.
+- A permanent Forever option at the bottom of the Idle menu that does not restore to Online.
 - Custom preset entries replace Discord's default native Idle duration choices.
 - Automatic return to Online when a custom timer ends.
 - Optional floating "Away" button fallback near Discord's lower-left user panel.

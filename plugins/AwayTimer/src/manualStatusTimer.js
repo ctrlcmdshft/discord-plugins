@@ -50,6 +50,19 @@ class ManualStatusTimer {
     return this.setIdleForMinutes(minutes);
   }
 
+  setIdleForever() {
+    if (!this.statusAdapter.canUpdateStatus()) {
+      this.notify("AwayTimer cannot change status in this Discord build.");
+      return false;
+    }
+
+    this.clearTimer();
+    BdApi.Data.delete?.(PLUGIN_NAME, ACTIVE_TIMER_KEY);
+    if (!this.statusAdapter.updateStatus("idle")) return false;
+    this.notify("Idle forever.");
+    return true;
+  }
+
   cancel({restore = false} = {}) {
     const active = BdApi.Data.load(PLUGIN_NAME, ACTIVE_TIMER_KEY);
     this.clearTimer();

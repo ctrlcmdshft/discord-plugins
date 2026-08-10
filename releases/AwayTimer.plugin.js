@@ -59,6 +59,17 @@ var require_manualStatusTimer = __commonJS({
         const minutes = Math.max(1, Math.round((expiresAt - Date.now()) / 6e4));
         return this.setIdleForMinutes(minutes);
       }
+      setIdleForever() {
+        if (!this.statusAdapter.canUpdateStatus()) {
+          this.notify("AwayTimer cannot change status in this Discord build.");
+          return false;
+        }
+        this.clearTimer();
+        BdApi.Data.delete?.(PLUGIN_NAME, ACTIVE_TIMER_KEY);
+        if (!this.statusAdapter.updateStatus("idle")) return false;
+        this.notify("Idle forever.");
+        return true;
+      }
       cancel({ restore = false } = {}) {
         const active = BdApi.Data.load(PLUGIN_NAME, ACTIVE_TIMER_KEY);
         this.clearTimer();
@@ -212,6 +223,20 @@ var require_menuInjector = __commonJS({
           });
           group.append(item);
         }
+        const foreverItem = templateItem.cloneNode(true);
+        foreverItem.classList.add("awaytimer-native-menu-item");
+        foreverItem.classList.remove("awaytimer-hidden-native-menu-item");
+        foreverItem.hidden = false;
+        foreverItem.removeAttribute("id");
+        foreverItem.setAttribute("data-awaytimer-forever", "true");
+        replaceVisibleText(foreverItem, "Forever");
+        foreverItem.addEventListener("click", (event) => {
+          event.preventDefault();
+          event.stopPropagation();
+          this.manualTimer.setIdleForever();
+          closeDiscordMenu();
+        });
+        group.append(foreverItem);
         return group;
       }
     };
@@ -322,6 +347,7 @@ var require_quickLauncher = __commonJS({
         ${this.settings.get("manualPresets").map((minutes) => `
           <button class="awaytimer-popover-button" data-minutes="${minutes}">${formatMinutes(minutes)}</button>
         `).join("")}
+        <button class="awaytimer-popover-button" data-forever>Forever</button>
       </div>
       <div class="awaytimer-popover-row">
         <input class="awaytimer-popover-input" type="number" min="1" max="1440" value="${this.settings.get("customDurationMinutes")}" data-custom-minutes />
@@ -338,6 +364,11 @@ var require_quickLauncher = __commonJS({
         const minutesButton = event.target.closest("[data-minutes]");
         if (minutesButton) {
           this.manualTimer.setIdleForMinutes(minutesButton.dataset.minutes);
+          this.close();
+          return;
+        }
+        if (event.target.closest("[data-forever]")) {
+          this.manualTimer.setIdleForever();
           this.close();
           return;
         }

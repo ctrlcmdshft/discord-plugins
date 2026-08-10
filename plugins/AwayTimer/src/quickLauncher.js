@@ -64,6 +64,7 @@ class QuickLauncher {
         ${this.settings.get("manualPresets").map((minutes) => `
           <button class="awaytimer-popover-button" data-minutes="${minutes}">${formatMinutes(minutes)}</button>
         `).join("")}
+        <button class="awaytimer-popover-button" data-forever>Forever</button>
       </div>
       <div class="awaytimer-popover-row">
         <input class="awaytimer-popover-input" type="number" min="1" max="1440" value="${this.settings.get("customDurationMinutes")}" data-custom-minutes />
@@ -81,6 +82,12 @@ class QuickLauncher {
     const minutesButton = event.target.closest("[data-minutes]");
     if (minutesButton) {
       this.manualTimer.setIdleForMinutes(minutesButton.dataset.minutes);
+      this.close();
+      return;
+    }
+
+    if (event.target.closest("[data-forever]")) {
+      this.manualTimer.setIdleForever();
       this.close();
       return;
     }

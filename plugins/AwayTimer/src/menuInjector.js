@@ -86,6 +86,21 @@ class MenuInjector {
       group.append(item);
     }
 
+    const foreverItem = templateItem.cloneNode(true);
+    foreverItem.classList.add("awaytimer-native-menu-item");
+    foreverItem.classList.remove("awaytimer-hidden-native-menu-item");
+    foreverItem.hidden = false;
+    foreverItem.removeAttribute("id");
+    foreverItem.setAttribute("data-awaytimer-forever", "true");
+    replaceVisibleText(foreverItem, "Forever");
+    foreverItem.addEventListener("click", (event) => {
+      event.preventDefault();
+      event.stopPropagation();
+      this.manualTimer.setIdleForever();
+      closeDiscordMenu();
+    });
+    group.append(foreverItem);
+
     return group;
   }
 }
