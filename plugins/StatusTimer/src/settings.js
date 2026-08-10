@@ -4,6 +4,7 @@ const LEGACY_PLUGIN_NAME = "AwayTimer";
 const DEFAULT_SETTINGS = Object.freeze({
   idlePresets: [15, 60, 480, 1440, 4320],
   dndPresets: [15, 60, 480, 1440, 4320],
+  invisiblePresets: [15, 60, 480, 1440, 4320],
   customDurationMinutes: 30,
   restoreManualTimersToOnline: true,
   showToasts: true
@@ -14,6 +15,7 @@ function normalizeSettings(value = {}) {
   return {
     idlePresets: normalizePresets(value.idlePresets || legacyPresets),
     dndPresets: normalizePresets(value.dndPresets || legacyPresets),
+    invisiblePresets: normalizePresets(value.invisiblePresets || legacyPresets),
     customDurationMinutes: clampNumber(value.customDurationMinutes, DEFAULT_SETTINGS.customDurationMinutes, 1, 4320),
     restoreManualTimersToOnline: value.restoreManualTimersToOnline !== undefined ? Boolean(value.restoreManualTimersToOnline) : DEFAULT_SETTINGS.restoreManualTimersToOnline,
     showToasts: value.showToasts !== undefined ? Boolean(value.showToasts) : DEFAULT_SETTINGS.showToasts

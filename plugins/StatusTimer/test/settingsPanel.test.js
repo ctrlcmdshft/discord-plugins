@@ -14,6 +14,7 @@ test("createSettingsPanel returns a DOM node without throwing", () => {
         return {
           idlePresets: [15, 60],
           dndPresets: [15, 60],
+          invisiblePresets: [15, 60],
           restoreManualTimersToOnline: true,
           showToasts: true
         }[key];
@@ -30,8 +31,9 @@ test("createSettingsPanel returns a DOM node without throwing", () => {
   });
 
   assert.equal(panel, element);
-  assert.match(panel.innerHTML, /Idle Presets/);
-  assert.match(panel.innerHTML, /Do Not Disturb Presets/);
+  assert.match(panel.innerHTML, /Idle/);
+  assert.match(panel.innerHTML, /Do Not Disturb/);
+  assert.match(panel.innerHTML, /Invisible/);
 });
 
 function createElementStub() {

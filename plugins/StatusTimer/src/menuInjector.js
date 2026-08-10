@@ -131,13 +131,13 @@ class MenuInjector {
 }
 
 function inferStatusKind(menu, fallback) {
-  if (fallback !== "idle" && fallback !== "dnd") return null;
+  if (!["idle", "dnd", "invisible"].includes(fallback)) return null;
   return fallback;
 }
 
 function statusKindFromText(text) {
-  if (text.includes("Invisible")) return "unsupported";
   if (text.includes("Online")) return "unsupported";
+  if (text.includes("Invisible")) return "invisible";
   if (text.includes("Do Not Disturb")) return "dnd";
   if (text.includes("Idle")) return "idle";
   return null;

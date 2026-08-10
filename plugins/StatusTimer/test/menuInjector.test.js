@@ -8,6 +8,7 @@ test("inferStatusKind blocks unsupported status menus", () => {
   };
 
   assert.equal(inferStatusKind({}, "unsupported"), null);
+  assert.equal(inferStatusKind({}, "online"), null);
   assert.equal(inferStatusKind({}, null), null);
 });
 
@@ -18,10 +19,12 @@ test("inferStatusKind allows tracked idle and dnd menus", () => {
 
   assert.equal(inferStatusKind({}, "idle"), "idle");
   assert.equal(inferStatusKind({}, "dnd"), "dnd");
+  assert.equal(inferStatusKind({}, "invisible"), "invisible");
 });
 
-test("statusKindFromText detects unsupported invisible menu text", () => {
-  assert.equal(statusKindFromText("Invisible You will appear offline"), "unsupported");
+test("statusKindFromText detects supported status menu text", () => {
+  assert.equal(statusKindFromText("Invisible You will appear offline"), "invisible");
+  assert.equal(statusKindFromText("Online"), "unsupported");
   assert.equal(statusKindFromText("Do Not Disturb You will not receive desktop notifications"), "dnd");
   assert.equal(statusKindFromText("Idle"), "idle");
 });

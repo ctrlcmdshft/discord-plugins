@@ -49,6 +49,10 @@ class ManualStatusTimer {
     return this.setStatusForMinutes("dnd", minutes);
   }
 
+  setInvisibleForMinutes(minutes) {
+    return this.setStatusForMinutes("invisible", minutes);
+  }
+
   setIdleUntil(timeValue) {
     const expiresAt = nextTimeTodayOrTomorrow(timeValue);
     if (!expiresAt) {
@@ -80,6 +84,10 @@ class ManualStatusTimer {
 
   setDndForever() {
     return this.setStatusForever("dnd");
+  }
+
+  setInvisibleForever() {
+    return this.setStatusForever("invisible");
   }
 
   cancel({restore = false} = {}) {
@@ -184,7 +192,12 @@ function formatClockTime(timestamp) {
 }
 
 function humanStatus(status) {
-  return status.charAt(0).toUpperCase() + status.slice(1);
+  return {
+    dnd: "Do Not Disturb",
+    idle: "Idle",
+    invisible: "Invisible",
+    online: "Online"
+  }[status] || String(status).charAt(0).toUpperCase() + String(status).slice(1);
 }
 
 module.exports = {

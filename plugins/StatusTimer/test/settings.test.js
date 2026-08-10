@@ -6,12 +6,14 @@ test("normalizeSettings keeps valid values", () => {
   assert.deepEqual(normalizeSettings({
     idlePresets: [5, 75],
     dndPresets: [10, 90],
+    invisiblePresets: [15, 120],
     customDurationMinutes: 12,
     restoreManualTimersToOnline: false,
     showToasts: false
   }), {
     idlePresets: [5, 75],
     dndPresets: [10, 90],
+    invisiblePresets: [15, 120],
     customDurationMinutes: 12,
     restoreManualTimersToOnline: false,
     showToasts: false
@@ -33,6 +35,7 @@ test("normalizeSettings sanitizes preset list", () => {
 
   assert.deepEqual(settings.idlePresets, [10, 20, 45]);
   assert.deepEqual(settings.dndPresets, [10, 20, 45]);
+  assert.deepEqual(settings.invisiblePresets, [10, 20, 45]);
 });
 
 test("normalizeSettings falls back to Discord defaults", () => {
@@ -40,6 +43,7 @@ test("normalizeSettings falls back to Discord defaults", () => {
 
   assert.deepEqual(settings.idlePresets, [15, 60, 480, 1440, 4320]);
   assert.deepEqual(settings.dndPresets, [15, 60, 480, 1440, 4320]);
+  assert.deepEqual(settings.invisiblePresets, [15, 60, 480, 1440, 4320]);
 });
 
 test("normalizeSettings falls back for invalid custom duration", () => {
