@@ -2,7 +2,7 @@
  * @name StatusTimer
  * @author ctrlcmdshft
  * @description Custom duration presets for Discord status timers.
- * @version 0.8.3
+ * @version 0.8.4
  */
 var __getOwnPropNames = Object.getOwnPropertyNames;
 var __commonJS = (cb, mod) => function __require() {
@@ -217,7 +217,6 @@ var require_menuInjector = __commonJS({
           node.classList.remove("awaytimer-hidden-native-menu-item");
           node.hidden = false;
         }
-        removeParentStatusSubtitles();
       }
       refresh() {
         for (const node of document.querySelectorAll(".awaytimer-native-menu-group")) {
@@ -227,7 +226,6 @@ var require_menuInjector = __commonJS({
           node.classList.remove("awaytimer-hidden-native-menu-item");
           node.hidden = false;
         }
-        removeParentStatusSubtitles();
         this.scheduleInject();
       }
       scheduleInject() {
@@ -235,7 +233,6 @@ var require_menuInjector = __commonJS({
         this.pending = true;
         requestAnimationFrame(() => {
           this.pending = false;
-          this.decorateParentStatusItems();
           this.injectIntoDurationMenus();
         });
       }
@@ -259,19 +256,6 @@ var require_menuInjector = __commonJS({
             item.classList.add("awaytimer-hidden-native-menu-item");
             item.hidden = true;
           }
-        }
-      }
-      decorateParentStatusItems() {
-        removeParentStatusSubtitles();
-        for (const item of findParentStatusItems()) {
-          const statusKind = statusKindFromText(normalizeText(item.textContent));
-          if (statusKind !== "idle" && statusKind !== "dnd") continue;
-          const activeTimer = this.manualTimer.getActiveTimer(statusKind);
-          if (!activeTimer) continue;
-          const subtitle = document.createElement("div");
-          subtitle.className = "awaytimer-parent-subtitle";
-          subtitle.textContent = `Until ${formatClockTime(activeTimer.expiresAt)}`;
-          appendSubtitle(item, subtitle);
         }
       }
       createMenuGroup(templateItem, statusKind) {
@@ -360,30 +344,6 @@ var require_menuInjector = __commonJS({
     function findCandidateMenus() {
       return Array.from(document.querySelectorAll('[role="menu"]')).filter((node) => node instanceof HTMLElement).filter((node) => !node.closest(".awaytimer-native-menu-group"));
     }
-    function findParentStatusItems() {
-      return Array.from(document.querySelectorAll('[role="menuitem"], button, [class*="item"]')).filter((node) => node instanceof HTMLElement).filter((node) => !node.closest(".awaytimer-native-menu-group")).filter((node) => {
-        const statusKind = statusKindFromText(normalizeText(node.textContent));
-        return statusKind === "idle" || statusKind === "dnd" || statusKind === "unsupported";
-      });
-    }
-    function appendSubtitle(item, subtitle) {
-      const existingTextNodes = Array.from(item.childNodes).filter((node) => node.nodeType === Node.TEXT_NODE);
-      if (existingTextNodes.length) {
-        item.append(subtitle);
-        return;
-      }
-      const textContainer = findBestTextContainer(item);
-      textContainer.append(subtitle);
-    }
-    function findBestTextContainer(item) {
-      const children = Array.from(item.querySelectorAll("div, span")).filter((node) => !node.querySelector(".awaytimer-parent-subtitle")).filter((node) => normalizeText(node.textContent));
-      return children.sort((first, second) => normalizeText(first.textContent).length - normalizeText(second.textContent).length)[0] || item;
-    }
-    function removeParentStatusSubtitles() {
-      for (const node of document.querySelectorAll(".awaytimer-parent-subtitle")) {
-        node.remove();
-      }
-    }
     function getNativeIdleDurationItems(menu) {
       const labels = [
         "For 15 Minutes",
@@ -423,7 +383,6 @@ var require_menuInjector = __commonJS({
     module2.exports = {
       MenuInjector: MenuInjector2,
       inferStatusKind,
-      removeParentStatusSubtitles,
       statusKindFromText
     };
   }
@@ -758,15 +717,6 @@ var require_styles = __commonJS({
 .awaytimer-active-timer {
   color: var(--text-muted, inherit) !important;
   cursor: default;
-}
-
-.awaytimer-parent-subtitle {
-  color: var(--text-muted, #6d6f78);
-  font-size: 12px;
-  font-weight: 500;
-  line-height: 16px;
-  margin-top: 1px;
-  pointer-events: none;
 }
 
 .awaytimer-hidden-native-menu-item {
