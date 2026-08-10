@@ -45,46 +45,18 @@ class StatusAdapter {
     }
   }
 
-  updateStatus(status, {expiresAt = null} = {}) {
+  updateStatus(status) {
     if (!this.canUpdateStatus()) return false;
 
     this.userSettingsUtils.updateAsync(
       "status",
       (statusSetting) => {
         statusSetting.status.value = status;
-        setNativeExpiration(statusSetting, expiresAt);
       },
       0
     );
     return true;
   }
-}
-
-function setNativeExpiration(statusSetting, expiresAt) {
-  const visited = new Set();
-  const queue = [statusSetting, statusSetting?.status].filter(Boolean);
-
-  while (queue.length) {
-    const target = queue.shift();
-    if (!target || typeof target !== "object" || visited.has(target)) continue;
-    visited.add(target);
-
-    for (const key of Object.keys(target)) {
-      const value = target[key];
-      if (/expire|expiration|until/i.test(key)) {
-        target[key] = coerceExpirationValue(value, expiresAt);
-      } else if (value && typeof value === "object") {
-        queue.push(value);
-      }
-    }
-  }
-}
-
-function coerceExpirationValue(existingValue, expiresAt) {
-  if (!expiresAt) return existingValue instanceof Date ? null : 0;
-  if (existingValue instanceof Date) return new Date(expiresAt);
-  if (typeof existingValue === "string") return new Date(expiresAt).toISOString();
-  return expiresAt;
 }
 
 module.exports = {

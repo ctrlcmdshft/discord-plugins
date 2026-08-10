@@ -2,7 +2,7 @@
  * @name StatusTimer
  * @author ctrlcmdshft
  * @description Custom duration presets for Discord status timers.
- * @version 1.0.0
+ * @version 1.0.1
  */
 var __getOwnPropNames = Object.getOwnPropertyNames;
 var __commonJS = (cb, mod) => function __require() {
@@ -41,7 +41,7 @@ var require_manualStatusTimer = __commonJS({
           this.notify("StatusTimer cannot change status in this Discord build.");
           return false;
         }
-        if (!this.statusAdapter.updateStatus(status, { expiresAt })) return false;
+        if (!this.statusAdapter.updateStatus(status)) return false;
         BdApi.Data.save(PLUGIN_NAME, ACTIVE_TIMER_KEY, {
           expiresAt,
           status,
@@ -78,7 +78,7 @@ var require_manualStatusTimer = __commonJS({
         this.clearTimer();
         BdApi.Data.delete?.(PLUGIN_NAME, ACTIVE_TIMER_KEY);
         BdApi.Data.delete?.(LEGACY_PLUGIN_NAME, ACTIVE_TIMER_KEY);
-        if (!this.statusAdapter.updateStatus(status, { expiresAt: null })) return false;
+        if (!this.statusAdapter.updateStatus(status)) return false;
         this.notify(`${humanStatus(status)} forever.`);
         return true;
       }
@@ -97,7 +97,7 @@ var require_manualStatusTimer = __commonJS({
         BdApi.Data.delete?.(PLUGIN_NAME, ACTIVE_TIMER_KEY);
         BdApi.Data.delete?.(LEGACY_PLUGIN_NAME, ACTIVE_TIMER_KEY);
         if (restore && active?.previousStatus && this.statusAdapter.currentStatus() === active.status) {
-          this.statusAdapter.updateStatus(active.previousStatus, { expiresAt: null });
+          this.statusAdapter.updateStatus(active.previousStatus);
         }
         this.notify("StatusTimer manual timer cancelled.");
       }
@@ -133,7 +133,7 @@ var require_manualStatusTimer = __commonJS({
         const restoreStatus = timerData?.restoreStatus || timerData?.previousStatus;
         const timerStatus = timerData?.status || "idle";
         if (!restoreStatus || this.statusAdapter.currentStatus() !== timerStatus) return;
-        if (this.statusAdapter.updateStatus(restoreStatus, { expiresAt: null })) {
+        if (this.statusAdapter.updateStatus(restoreStatus)) {
           this.notify(`StatusTimer restored ${humanStatus(restoreStatus)}.`);
         }
       }
@@ -689,42 +689,18 @@ var require_statusAdapter = __commonJS({
           return false;
         }
       }
-      updateStatus(status, { expiresAt = null } = {}) {
+      updateStatus(status) {
         if (!this.canUpdateStatus()) return false;
         this.userSettingsUtils.updateAsync(
           "status",
           (statusSetting) => {
             statusSetting.status.value = status;
-            setNativeExpiration(statusSetting, expiresAt);
           },
           0
         );
         return true;
       }
     };
-    function setNativeExpiration(statusSetting, expiresAt) {
-      const visited = /* @__PURE__ */ new Set();
-      const queue = [statusSetting, statusSetting?.status].filter(Boolean);
-      while (queue.length) {
-        const target = queue.shift();
-        if (!target || typeof target !== "object" || visited.has(target)) continue;
-        visited.add(target);
-        for (const key of Object.keys(target)) {
-          const value = target[key];
-          if (/expire|expiration|until/i.test(key)) {
-            target[key] = coerceExpirationValue(value, expiresAt);
-          } else if (value && typeof value === "object") {
-            queue.push(value);
-          }
-        }
-      }
-    }
-    function coerceExpirationValue(existingValue, expiresAt) {
-      if (!expiresAt) return existingValue instanceof Date ? null : 0;
-      if (existingValue instanceof Date) return new Date(expiresAt);
-      if (typeof existingValue === "string") return new Date(expiresAt).toISOString();
-      return expiresAt;
-    }
     module2.exports = {
       StatusAdapter: StatusAdapter2
     };
