@@ -2,7 +2,7 @@
  * @name StatusTimer
  * @author ctrlcmdshft
  * @description Custom duration presets for Discord status timers.
- * @version 0.9.3
+ * @version 0.9.4
  */
 var __getOwnPropNames = Object.getOwnPropertyNames;
 var __commonJS = (cb, mod) => function __require() {
@@ -228,6 +228,7 @@ var require_menuInjector = __commonJS({
           node.classList.remove("awaytimer-hidden-native-menu-item");
           node.hidden = false;
         }
+        removeParentStatusSubtitles();
       }
       refresh() {
         for (const node of document.querySelectorAll(".awaytimer-native-menu-group")) {
@@ -237,6 +238,7 @@ var require_menuInjector = __commonJS({
           node.classList.remove("awaytimer-hidden-native-menu-item");
           node.hidden = false;
         }
+        removeParentStatusSubtitles();
         this.scheduleInject();
       }
       scheduleInject() {
@@ -244,6 +246,7 @@ var require_menuInjector = __commonJS({
         this.pending = true;
         requestAnimationFrame(() => {
           this.pending = false;
+          this.decorateParentStatusItems();
           this.injectIntoDurationMenus();
         });
       }
@@ -267,6 +270,22 @@ var require_menuInjector = __commonJS({
             item.classList.add("awaytimer-hidden-native-menu-item");
             item.hidden = true;
           }
+        }
+      }
+      decorateParentStatusItems() {
+        const activeSubtitles = /* @__PURE__ */ new Set();
+        for (const item of findParentStatusItems()) {
+          const statusKind = statusKindFromText(normalizeText(item.textContent));
+          if (!["idle", "dnd", "invisible"].includes(statusKind)) continue;
+          const activeTimer = this.manualTimer.getActiveTimer(statusKind);
+          if (!activeTimer) continue;
+          const label = `Until ${formatClockTime(activeTimer.expiresAt)}`;
+          const subtitle = ensureParentStatusSubtitle(item);
+          if (subtitle.textContent !== label) subtitle.textContent = label;
+          activeSubtitles.add(subtitle);
+        }
+        for (const subtitle of document.querySelectorAll(".awaytimer-parent-subtitle")) {
+          if (!activeSubtitles.has(subtitle)) subtitle.remove();
         }
       }
       createMenuGroup(templateItem, statusKind) {
@@ -337,17 +356,56 @@ var require_menuInjector = __commonJS({
     function findCandidateMenus() {
       return Array.from(document.querySelectorAll('[role="menu"]')).filter((node) => node instanceof HTMLElement).filter((node) => !node.closest(".awaytimer-native-menu-group"));
     }
+    function findParentStatusItems() {
+      return Array.from(document.querySelectorAll('[role="menuitem"], button, [class*="item"]')).filter((node) => node instanceof HTMLElement).filter((node) => !node.closest(".awaytimer-native-menu-group")).filter((node) => !node.classList.contains("awaytimer-native-menu-item")).filter((node) => !node.classList.contains("awaytimer-hidden-native-menu-item")).filter((node) => {
+        const text = normalizeText(node.textContent);
+        if (isNativeDurationLabel(text)) return false;
+        return ["idle", "dnd", "invisible"].includes(statusKindFromText(text));
+      });
+    }
+    function ensureParentStatusSubtitle(item) {
+      const existing = item.querySelector(".awaytimer-parent-subtitle");
+      if (existing) return existing;
+      const subtitle = document.createElement("div");
+      subtitle.className = "awaytimer-parent-subtitle";
+      subtitle.style.color = "var(--text-muted)";
+      subtitle.style.fontSize = "12px";
+      subtitle.style.lineHeight = "16px";
+      subtitle.style.fontWeight = "500";
+      const textContainer = findStatusTextContainer(item);
+      textContainer.append(subtitle);
+      return subtitle;
+    }
+    function findStatusTextContainer(item) {
+      const textNodes = getTextNodes(item).filter((node) => ["idle", "dnd", "invisible"].includes(statusKindFromText(normalizeText(node.textContent))));
+      const textNode = textNodes[0];
+      const parent = textNode?.parentElement;
+      if (parent && parent !== item) return parent;
+      return item;
+    }
+    function getTextNodes(node) {
+      const walker = document.createTreeWalker(node, NodeFilter.SHOW_TEXT);
+      const textNodes = [];
+      while (walker.nextNode()) textNodes.push(walker.currentNode);
+      return textNodes;
+    }
+    function removeParentStatusSubtitles() {
+      for (const node of document.querySelectorAll(".awaytimer-parent-subtitle")) {
+        node.remove();
+      }
+    }
     function getNativeIdleDurationItems(menu) {
-      const labels = [
+      return Array.from(menu.querySelectorAll('[role="menuitem"], button')).filter((node) => node instanceof HTMLElement).filter((node) => !node.classList.contains("awaytimer-native-menu-item")).filter((node) => !node.closest(".awaytimer-native-menu-group")).filter((node) => !node.classList.contains("awaytimer-hidden-native-menu-item")).filter((node) => isNativeDurationLabel(normalizeText(node.textContent)));
+    }
+    function isNativeDurationLabel(text) {
+      return [
         "For 15 Minutes",
         "For 1 Hour",
         "For 8 Hours",
         "For 24 Hours",
         "For 3 Days",
         "Forever"
-      ];
-      const labelSet = new Set(labels);
-      return Array.from(menu.querySelectorAll('[role="menuitem"], button')).filter((node) => node instanceof HTMLElement).filter((node) => !node.classList.contains("awaytimer-native-menu-item")).filter((node) => !node.closest(".awaytimer-native-menu-group")).filter((node) => !node.classList.contains("awaytimer-hidden-native-menu-item")).filter((node) => labelSet.has(normalizeText(node.textContent)));
+      ].includes(text);
     }
     function replaceVisibleText(node, label) {
       const walker = document.createTreeWalker(node, NodeFilter.SHOW_TEXT);
