@@ -1,6 +1,6 @@
 {
   "name": "betterdiscord-status-timer",
-  "version": "0.9.0",
+  "version": "0.9.1",
   "description": "Custom duration presets for Discord status timers.",
   "private": true,
   "main": "dist/StatusTimer.plugin.js",
