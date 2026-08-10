@@ -1,4 +1,3 @@
-const {AwayController} = require("./awayController");
 const {ManualStatusTimer} = require("./manualStatusTimer");
 const {MenuInjector} = require("./menuInjector");
 const {QuickLauncher} = require("./quickLauncher");
@@ -12,7 +11,6 @@ class AwayTimer {
     this.meta = meta;
     this.settings = null;
     this.statusAdapter = null;
-    this.controller = null;
     this.manualTimer = null;
     this.menuInjector = null;
     this.quickLauncher = null;
@@ -22,7 +20,6 @@ class AwayTimer {
     BdApi.DOM.addStyle(this.meta.name, styles);
     this.settings = new SettingsStore({
       onChange: () => {
-        this.controller?.refreshSchedule();
         this.menuInjector?.refresh();
         this.syncQuickLauncher();
       }
@@ -38,13 +35,6 @@ class AwayTimer {
       logger: (message, level) => this.log(message, level)
     });
     this.manualTimer.start();
-    this.controller = new AwayController({
-      settings: this.settings,
-      statusAdapter: this.statusAdapter,
-      notify: (message) => this.notify(message),
-      logger: (message, level) => this.log(message, level)
-    });
-    this.controller.start();
     this.menuInjector = new MenuInjector({
       settings: this.settings,
       manualTimer: this.manualTimer
@@ -62,10 +52,8 @@ class AwayTimer {
   stop() {
     this.menuInjector?.stop();
     this.quickLauncher?.stop();
-    this.controller?.stop();
     this.manualTimer?.stop();
     this.statusAdapter?.stop();
-    this.controller = null;
     this.menuInjector = null;
     this.quickLauncher = null;
     this.manualTimer = null;

@@ -4,40 +4,26 @@ const {normalizeSettings} = require("../src/settings");
 
 test("normalizeSettings keeps valid values", () => {
   assert.deepEqual(normalizeSettings({
-    awayMinutes: 45,
-    restoreDelaySeconds: 10,
-    enableAutoAway: true,
     manualPresets: [5, 75],
     customDurationMinutes: 12,
     restoreManualTimersToOnline: false,
     showQuickButton: true,
-    skipVoice: false,
-    onlyWhenOnline: false,
-    showToasts: false,
-    debugFastMode: true
+    showToasts: false
   }), {
-    awayMinutes: 45,
-    restoreDelaySeconds: 10,
-    enableAutoAway: true,
     manualPresets: [5, 75],
     customDurationMinutes: 12,
     restoreManualTimersToOnline: false,
     showQuickButton: true,
-    skipVoice: false,
-    onlyWhenOnline: false,
-    showToasts: false,
-    debugFastMode: true
+    showToasts: false
   });
 });
 
-test("normalizeSettings clamps numeric values", () => {
+test("normalizeSettings clamps custom duration values", () => {
   const settings = normalizeSettings({
-    awayMinutes: 999,
-    restoreDelaySeconds: -5
+    customDurationMinutes: 9999
   });
 
-  assert.equal(settings.awayMinutes, 240);
-  assert.equal(settings.restoreDelaySeconds, 0);
+  assert.equal(settings.customDurationMinutes, 1440);
 });
 
 test("normalizeSettings sanitizes preset list", () => {
@@ -48,12 +34,10 @@ test("normalizeSettings sanitizes preset list", () => {
   assert.deepEqual(settings.manualPresets, [10, 20, 45]);
 });
 
-test("normalizeSettings falls back for invalid numbers", () => {
+test("normalizeSettings falls back for invalid custom duration", () => {
   const settings = normalizeSettings({
-    awayMinutes: "nope",
-    restoreDelaySeconds: Number.NaN
+    customDurationMinutes: "nope"
   });
 
-  assert.equal(settings.awayMinutes, 15);
-  assert.equal(settings.restoreDelaySeconds, 5);
+  assert.equal(settings.customDurationMinutes, 30);
 });

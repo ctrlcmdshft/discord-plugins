@@ -2,7 +2,7 @@
  * @name AwayTimer
  * @author ctrlcmdshft
  * @description Choose exactly when Discord should show you as away/idle.
- * @version 0.2.0
+ * @version 0.3.0
  */
 var __getOwnPropNames = Object.getOwnPropertyNames;
 var __commonJS = (cb, mod) => function __require() {
@@ -12,137 +12,6 @@ var __commonJS = (cb, mod) => function __require() {
     throw mod = 0, e;
   }
 };
-
-// src/awayController.js
-var require_awayController = __commonJS({
-  "src/awayController.js"(exports2, module2) {
-    var PLUGIN_NAME = "AwayTimer";
-    var PLUGIN_SET_IDLE_KEY = "pluginSetIdle";
-    var VALID_ACTIVITY_EVENTS = ["keydown", "pointerdown", "wheel"];
-    var AwayController2 = class {
-      constructor({ settings, statusAdapter, notify, logger }) {
-        this.settings = settings;
-        this.statusAdapter = statusAdapter;
-        this.notify = notify;
-        this.logger = logger;
-        this.awayTimer = null;
-        this.restoreTimer = null;
-        this.lastActivityAt = Date.now();
-        this.handleActivity = this.handleActivity.bind(this);
-        this.handleBlur = this.handleBlur.bind(this);
-        this.handleFocus = this.handleFocus.bind(this);
-      }
-      start() {
-        for (const eventName of VALID_ACTIVITY_EVENTS) {
-          window.addEventListener(eventName, this.handleActivity, { passive: true });
-        }
-        window.addEventListener("blur", this.handleBlur);
-        window.addEventListener("focus", this.handleFocus);
-        this.scheduleAway();
-      }
-      stop() {
-        for (const eventName of VALID_ACTIVITY_EVENTS) {
-          window.removeEventListener(eventName, this.handleActivity);
-        }
-        window.removeEventListener("blur", this.handleBlur);
-        window.removeEventListener("focus", this.handleFocus);
-        this.clearTimers();
-      }
-      refreshSchedule() {
-        this.clearTimers();
-        this.scheduleAway();
-      }
-      handleActivity() {
-        this.lastActivityAt = Date.now();
-        this.cancelAwayTimer();
-        this.scheduleRestoreIfNeeded();
-        this.scheduleAway();
-      }
-      handleBlur() {
-        this.lastActivityAt = Date.now();
-        this.cancelRestoreTimer();
-        this.cancelAwayTimer();
-        this.scheduleAway();
-      }
-      handleFocus() {
-        this.handleActivity();
-      }
-      scheduleAway() {
-        if (!this.settings.get("enableAutoAway")) return;
-        const delay = this.awayDelayMs();
-        this.awayTimer = window.setTimeout(() => this.goAwayIfAllowed(), delay);
-      }
-      goAwayIfAllowed() {
-        this.awayTimer = null;
-        const currentStatus = this.statusAdapter.currentStatus();
-        if (!this.statusAdapter.canUpdateStatus()) {
-          this.logger("AwayTimer cannot update status with this Discord build.", "warn");
-          return;
-        }
-        if (this.settings.get("skipVoice") && this.statusAdapter.inVoiceChannel()) {
-          this.logger("Skipped away status because you are in voice.");
-          this.scheduleAway();
-          return;
-        }
-        if (this.settings.get("onlyWhenOnline") && currentStatus !== "online") {
-          this.logger(`Skipped away status because current status is ${currentStatus}.`);
-          this.scheduleAway();
-          return;
-        }
-        if (currentStatus === "idle") {
-          this.logger("Already idle; leaving status unchanged.");
-          return;
-        }
-        if (this.statusAdapter.updateStatus("idle")) {
-          BdApi.Data.save(PLUGIN_NAME, PLUGIN_SET_IDLE_KEY, true);
-          this.notify("AwayTimer set your status to Idle.");
-        }
-      }
-      scheduleRestoreIfNeeded() {
-        if (BdApi.Data.load(PLUGIN_NAME, PLUGIN_SET_IDLE_KEY) !== true) return;
-        if (this.statusAdapter.currentStatus() !== "idle") {
-          BdApi.Data.save(PLUGIN_NAME, PLUGIN_SET_IDLE_KEY, false);
-          return;
-        }
-        this.cancelRestoreTimer();
-        this.restoreTimer = window.setTimeout(() => this.restoreOnlineIfAllowed(), this.settings.get("restoreDelaySeconds") * 1e3);
-      }
-      restoreOnlineIfAllowed() {
-        this.restoreTimer = null;
-        if (BdApi.Data.load(PLUGIN_NAME, PLUGIN_SET_IDLE_KEY) !== true) return;
-        if (this.statusAdapter.currentStatus() !== "idle") {
-          BdApi.Data.save(PLUGIN_NAME, PLUGIN_SET_IDLE_KEY, false);
-          return;
-        }
-        if (this.statusAdapter.updateStatus("online")) {
-          BdApi.Data.save(PLUGIN_NAME, PLUGIN_SET_IDLE_KEY, false);
-          this.notify("AwayTimer restored your status to Online.");
-        }
-      }
-      awayDelayMs() {
-        const unit = this.settings.get("debugFastMode") ? 1e3 : 60 * 1e3;
-        return this.settings.get("awayMinutes") * unit;
-      }
-      clearTimers() {
-        this.cancelAwayTimer();
-        this.cancelRestoreTimer();
-      }
-      cancelAwayTimer() {
-        if (!this.awayTimer) return;
-        window.clearTimeout(this.awayTimer);
-        this.awayTimer = null;
-      }
-      cancelRestoreTimer() {
-        if (!this.restoreTimer) return;
-        window.clearTimeout(this.restoreTimer);
-        this.restoreTimer = null;
-      }
-    };
-    module2.exports = {
-      AwayController: AwayController2
-    };
-  }
-});
 
 // src/manualStatusTimer.js
 var require_manualStatusTimer = __commonJS({
@@ -508,31 +377,19 @@ var require_settings = __commonJS({
   "src/settings.js"(exports2, module2) {
     var PLUGIN_NAME = "AwayTimer";
     var DEFAULT_SETTINGS = Object.freeze({
-      enableAutoAway: false,
-      awayMinutes: 15,
-      restoreDelaySeconds: 5,
-      manualPresets: [20, 45, 90, 150, 360],
+      manualPresets: [20, 45, 120, 240, 1440],
       customDurationMinutes: 30,
       restoreManualTimersToOnline: true,
       showQuickButton: false,
-      skipVoice: true,
-      onlyWhenOnline: true,
-      showToasts: true,
-      debugFastMode: false
+      showToasts: true
     });
     function normalizeSettings(value = {}) {
       return {
-        enableAutoAway: value.enableAutoAway !== void 0 ? Boolean(value.enableAutoAway) : DEFAULT_SETTINGS.enableAutoAway,
-        awayMinutes: clampNumber(value.awayMinutes, DEFAULT_SETTINGS.awayMinutes, 1, 240),
-        restoreDelaySeconds: clampNumber(value.restoreDelaySeconds, DEFAULT_SETTINGS.restoreDelaySeconds, 0, 120),
         manualPresets: normalizePresets(value.manualPresets),
         customDurationMinutes: clampNumber(value.customDurationMinutes, DEFAULT_SETTINGS.customDurationMinutes, 1, 1440),
         restoreManualTimersToOnline: value.restoreManualTimersToOnline !== void 0 ? Boolean(value.restoreManualTimersToOnline) : DEFAULT_SETTINGS.restoreManualTimersToOnline,
         showQuickButton: value.showQuickButton !== void 0 ? Boolean(value.showQuickButton) : DEFAULT_SETTINGS.showQuickButton,
-        skipVoice: value.skipVoice !== void 0 ? Boolean(value.skipVoice) : DEFAULT_SETTINGS.skipVoice,
-        onlyWhenOnline: value.onlyWhenOnline !== void 0 ? Boolean(value.onlyWhenOnline) : DEFAULT_SETTINGS.onlyWhenOnline,
-        showToasts: value.showToasts !== void 0 ? Boolean(value.showToasts) : DEFAULT_SETTINGS.showToasts,
-        debugFastMode: value.debugFastMode !== void 0 ? Boolean(value.debugFastMode) : DEFAULT_SETTINGS.debugFastMode
+        showToasts: value.showToasts !== void 0 ? Boolean(value.showToasts) : DEFAULT_SETTINGS.showToasts
       };
     }
     function normalizePresets(value) {
@@ -569,35 +426,6 @@ var require_settings = __commonJS({
           settings: [
             {
               type: "switch",
-              id: "enableAutoAway",
-              name: "Enable Auto-Away",
-              note: "Automatically set Idle after no Discord activity. Leave this off if you only want manual custom timers.",
-              value: this.values.enableAutoAway
-            },
-            {
-              type: "slider",
-              id: "awayMinutes",
-              name: "Show Away After",
-              note: "Minutes of no Discord activity before changing your status to Idle.",
-              value: this.values.awayMinutes,
-              min: 1,
-              max: 240,
-              units: "min",
-              markers: [1, 5, 10, 15, 30, 60, 120, 240]
-            },
-            {
-              type: "slider",
-              id: "restoreDelaySeconds",
-              name: "Return Online Delay",
-              note: "Seconds to wait after Discord activity before returning to Online.",
-              value: this.values.restoreDelaySeconds,
-              min: 0,
-              max: 120,
-              units: "s",
-              markers: [0, 5, 10, 30, 60, 120]
-            },
-            {
-              type: "switch",
               id: "restoreManualTimersToOnline",
               name: "Manual Timers Return To Online",
               note: "When a custom Idle timer ends, set your status back to Online instead of restoring the previous status.",
@@ -612,31 +440,10 @@ var require_settings = __commonJS({
             },
             {
               type: "switch",
-              id: "skipVoice",
-              name: "Do Not Change Status While In Voice",
-              note: "Keeps your current status untouched when you are connected to a voice channel.",
-              value: this.values.skipVoice
-            },
-            {
-              type: "switch",
-              id: "onlyWhenOnline",
-              name: "Only Change From Online",
-              note: "Prevents overriding Do Not Disturb, Invisible, or a manual Idle status.",
-              value: this.values.onlyWhenOnline
-            },
-            {
-              type: "switch",
               id: "showToasts",
               name: "Show Toasts",
               note: "Shows a small notice when AwayTimer changes your status.",
               value: this.values.showToasts
-            },
-            {
-              type: "switch",
-              id: "debugFastMode",
-              name: "Test Mode",
-              note: "Uses seconds instead of minutes for the away timer.",
-              value: this.values.debugFastMode
             }
           ],
           onChange: (_, id, value) => this.set(id, value)
@@ -686,26 +493,10 @@ var require_settingsPanel = __commonJS({
       <div class="awaytimer-section">
         <div class="awaytimer-field">
           <label class="awaytimer-title" for="awaytimer-presets">Preset minutes</label>
-          <div class="awaytimer-note">Comma-separated minutes. Example: 10, 20, 45, 90, 150, 360</div>
+          <div class="awaytimer-note">Comma-separated minutes. Default: 20, 45, 120, 240, 1440</div>
           <input id="awaytimer-presets" class="awaytimer-input" value="${escapeAttribute(settings.get("manualPresets").join(", "))}" />
         </div>
         <button class="awaytimer-button secondary" data-save-presets>Save Presets</button>
-      </div>
-      <div class="awaytimer-section">
-        <div class="awaytimer-title">One-Off Timer</div>
-        <div class="awaytimer-row">
-          <input class="awaytimer-input" type="number" min="1" max="1440" value="${settings.get("customDurationMinutes")}" data-custom-minutes />
-          <button class="awaytimer-button" data-custom-start>Set Idle For Minutes</button>
-        </div>
-        <div class="awaytimer-row">
-          <input class="awaytimer-input" type="time" data-until-time />
-          <button class="awaytimer-button" data-until-start>Set Idle Until Time</button>
-        </div>
-        <button class="awaytimer-button secondary" data-cancel-timer>Cancel Manual Timer</button>
-      </div>
-      <div class="awaytimer-section">
-        <div class="awaytimer-title">Auto-Away</div>
-        <div class="awaytimer-note">The old inactivity feature is still available in the native settings below, but it is off by default now.</div>
       </div>
     `;
         root.append(settings.getSettingsPanel());
@@ -718,19 +509,7 @@ var require_settingsPanel = __commonJS({
           settings.set("manualPresets", parsePresetText(input.value));
           render();
         }
-        if (event.target.closest("[data-custom-start]")) {
-          const input = root.querySelector("[data-custom-minutes]");
-          settings.set("customDurationMinutes", input.value);
-          manualTimer.setIdleForMinutes(input.value);
-          render();
-        }
-        if (event.target.closest("[data-until-start]")) {
-          const input = root.querySelector("[data-until-time]");
-          manualTimer.setIdleUntil(input.value);
-        }
-        if (event.target.closest("[data-cancel-timer]")) {
-          manualTimer.cancel({ restore: true });
-        }
+        if (event.target.closest("[data-cancel-timer]")) manualTimer.cancel({ restore: true });
       });
       render();
       return root;
@@ -931,7 +710,6 @@ var require_styles = __commonJS({
 });
 
 // src/index.js
-var { AwayController } = require_awayController();
 var { ManualStatusTimer } = require_manualStatusTimer();
 var { MenuInjector } = require_menuInjector();
 var { QuickLauncher } = require_quickLauncher();
@@ -944,7 +722,6 @@ var AwayTimer = class {
     this.meta = meta;
     this.settings = null;
     this.statusAdapter = null;
-    this.controller = null;
     this.manualTimer = null;
     this.menuInjector = null;
     this.quickLauncher = null;
@@ -953,7 +730,6 @@ var AwayTimer = class {
     BdApi.DOM.addStyle(this.meta.name, styles);
     this.settings = new SettingsStore({
       onChange: () => {
-        this.controller?.refreshSchedule();
         this.menuInjector?.refresh();
         this.syncQuickLauncher();
       }
@@ -969,13 +745,6 @@ var AwayTimer = class {
       logger: (message, level) => this.log(message, level)
     });
     this.manualTimer.start();
-    this.controller = new AwayController({
-      settings: this.settings,
-      statusAdapter: this.statusAdapter,
-      notify: (message) => this.notify(message),
-      logger: (message, level) => this.log(message, level)
-    });
-    this.controller.start();
     this.menuInjector = new MenuInjector({
       settings: this.settings,
       manualTimer: this.manualTimer
@@ -991,10 +760,8 @@ var AwayTimer = class {
   stop() {
     this.menuInjector?.stop();
     this.quickLauncher?.stop();
-    this.controller?.stop();
     this.manualTimer?.stop();
     this.statusAdapter?.stop();
-    this.controller = null;
     this.menuInjector = null;
     this.quickLauncher = null;
     this.manualTimer = null;

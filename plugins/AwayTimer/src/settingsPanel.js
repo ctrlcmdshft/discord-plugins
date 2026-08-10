@@ -31,26 +31,10 @@ function createSettingsPanel({settings, manualTimer}) {
       <div class="awaytimer-section">
         <div class="awaytimer-field">
           <label class="awaytimer-title" for="awaytimer-presets">Preset minutes</label>
-          <div class="awaytimer-note">Comma-separated minutes. Example: 10, 20, 45, 90, 150, 360</div>
+          <div class="awaytimer-note">Comma-separated minutes. Default: 20, 45, 120, 240, 1440</div>
           <input id="awaytimer-presets" class="awaytimer-input" value="${escapeAttribute(settings.get("manualPresets").join(", "))}" />
         </div>
         <button class="awaytimer-button secondary" data-save-presets>Save Presets</button>
-      </div>
-      <div class="awaytimer-section">
-        <div class="awaytimer-title">One-Off Timer</div>
-        <div class="awaytimer-row">
-          <input class="awaytimer-input" type="number" min="1" max="1440" value="${settings.get("customDurationMinutes")}" data-custom-minutes />
-          <button class="awaytimer-button" data-custom-start>Set Idle For Minutes</button>
-        </div>
-        <div class="awaytimer-row">
-          <input class="awaytimer-input" type="time" data-until-time />
-          <button class="awaytimer-button" data-until-start>Set Idle Until Time</button>
-        </div>
-        <button class="awaytimer-button secondary" data-cancel-timer>Cancel Manual Timer</button>
-      </div>
-      <div class="awaytimer-section">
-        <div class="awaytimer-title">Auto-Away</div>
-        <div class="awaytimer-note">The old inactivity feature is still available in the native settings below, but it is off by default now.</div>
       </div>
     `;
     root.append(settings.getSettingsPanel());
@@ -66,21 +50,7 @@ function createSettingsPanel({settings, manualTimer}) {
       render();
     }
 
-    if (event.target.closest("[data-custom-start]")) {
-      const input = root.querySelector("[data-custom-minutes]");
-      settings.set("customDurationMinutes", input.value);
-      manualTimer.setIdleForMinutes(input.value);
-      render();
-    }
-
-    if (event.target.closest("[data-until-start]")) {
-      const input = root.querySelector("[data-until-time]");
-      manualTimer.setIdleUntil(input.value);
-    }
-
-    if (event.target.closest("[data-cancel-timer]")) {
-      manualTimer.cancel({restore: true});
-    }
+    if (event.target.closest("[data-cancel-timer]")) manualTimer.cancel({restore: true});
   });
 
   render();
