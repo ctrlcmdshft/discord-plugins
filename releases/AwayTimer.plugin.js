@@ -2,7 +2,7 @@
  * @name AwayTimer
  * @author ctrlcmdshft
  * @description Choose exactly when Discord should show you as away/idle.
- * @version 0.5.0
+ * @version 0.6.0
  */
 var __getOwnPropNames = Object.getOwnPropertyNames;
 var __commonJS = (cb, mod) => function __require() {
@@ -165,7 +165,7 @@ var require_manualStatusTimer = __commonJS({
 // src/menuInjector.js
 var require_menuInjector = __commonJS({
   "src/menuInjector.js"(exports2, module2) {
-    var { formatMinutes } = require_manualStatusTimer();
+    var { formatClockTime, formatMinutes } = require_manualStatusTimer();
     var MenuInjector2 = class {
       constructor({ settings, manualTimer }) {
         this.settings = settings;
@@ -228,12 +228,25 @@ var require_menuInjector = __commonJS({
         const group = document.createElement("div");
         group.className = "awaytimer-native-menu-group";
         group.setAttribute("role", "group");
+        const activeTimer = this.manualTimer.getActiveTimer();
+        if (activeTimer) {
+          const activeItem = createClonedMenuItem(templateItem, "awaytimer-active-timer");
+          activeItem.setAttribute("aria-disabled", "true");
+          activeItem.style.pointerEvents = "none";
+          replaceVisibleText(activeItem, `Active until ${formatClockTime(activeTimer.expiresAt)}`);
+          group.append(activeItem);
+          const cancelItem = createClonedMenuItem(templateItem, "awaytimer-cancel-timer");
+          replaceVisibleText(cancelItem, "Cancel Timer");
+          cancelItem.addEventListener("click", (event) => {
+            event.preventDefault();
+            event.stopPropagation();
+            this.manualTimer.cancel({ restore: true });
+            closeDiscordMenu();
+          });
+          group.append(cancelItem);
+        }
         for (const minutes of this.settings.get("manualPresets")) {
-          const item = templateItem.cloneNode(true);
-          item.classList.add("awaytimer-native-menu-item");
-          item.classList.remove("awaytimer-hidden-native-menu-item");
-          item.hidden = false;
-          item.removeAttribute("id");
+          const item = createClonedMenuItem(templateItem, "awaytimer-minutes");
           item.setAttribute("data-awaytimer-minutes", String(minutes));
           replaceVisibleText(item, `For ${formatMinutes(minutes)}`);
           item.addEventListener("click", (event) => {
@@ -244,11 +257,7 @@ var require_menuInjector = __commonJS({
           });
           group.append(item);
         }
-        const foreverItem = templateItem.cloneNode(true);
-        foreverItem.classList.add("awaytimer-native-menu-item");
-        foreverItem.classList.remove("awaytimer-hidden-native-menu-item");
-        foreverItem.hidden = false;
-        foreverItem.removeAttribute("id");
+        const foreverItem = createClonedMenuItem(templateItem, "awaytimer-forever");
         foreverItem.setAttribute("data-awaytimer-forever", "true");
         replaceVisibleText(foreverItem, "Forever");
         foreverItem.addEventListener("click", (event) => {
@@ -261,6 +270,14 @@ var require_menuInjector = __commonJS({
         return group;
       }
     };
+    function createClonedMenuItem(templateItem, kind) {
+      const item = templateItem.cloneNode(true);
+      item.classList.add("awaytimer-native-menu-item", kind);
+      item.classList.remove("awaytimer-hidden-native-menu-item");
+      item.hidden = false;
+      item.removeAttribute("id");
+      return item;
+    }
     function findCandidateMenus() {
       return Array.from(document.querySelectorAll('[role="menu"]')).filter((node) => node instanceof HTMLElement).filter((node) => !node.closest(".awaytimer-native-menu-group"));
     }
@@ -832,6 +849,11 @@ var require_styles = __commonJS({
 
 .awaytimer-native-menu-item {
   cursor: pointer;
+}
+
+.awaytimer-active-timer {
+  color: var(--text-muted, inherit) !important;
+  cursor: default;
 }
 
 .awaytimer-hidden-native-menu-item {

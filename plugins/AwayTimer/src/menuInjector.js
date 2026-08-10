@@ -1,4 +1,4 @@
-const {formatMinutes} = require("./manualStatusTimer");
+const {formatClockTime, formatMinutes} = require("./manualStatusTimer");
 
 class MenuInjector {
   constructor({settings, manualTimer}) {
@@ -69,12 +69,27 @@ class MenuInjector {
     group.className = "awaytimer-native-menu-group";
     group.setAttribute("role", "group");
 
+    const activeTimer = this.manualTimer.getActiveTimer();
+    if (activeTimer) {
+      const activeItem = createClonedMenuItem(templateItem, "awaytimer-active-timer");
+      activeItem.setAttribute("aria-disabled", "true");
+      activeItem.style.pointerEvents = "none";
+      replaceVisibleText(activeItem, `Active until ${formatClockTime(activeTimer.expiresAt)}`);
+      group.append(activeItem);
+
+      const cancelItem = createClonedMenuItem(templateItem, "awaytimer-cancel-timer");
+      replaceVisibleText(cancelItem, "Cancel Timer");
+      cancelItem.addEventListener("click", (event) => {
+        event.preventDefault();
+        event.stopPropagation();
+        this.manualTimer.cancel({restore: true});
+        closeDiscordMenu();
+      });
+      group.append(cancelItem);
+    }
+
     for (const minutes of this.settings.get("manualPresets")) {
-      const item = templateItem.cloneNode(true);
-      item.classList.add("awaytimer-native-menu-item");
-      item.classList.remove("awaytimer-hidden-native-menu-item");
-      item.hidden = false;
-      item.removeAttribute("id");
+      const item = createClonedMenuItem(templateItem, "awaytimer-minutes");
       item.setAttribute("data-awaytimer-minutes", String(minutes));
       replaceVisibleText(item, `For ${formatMinutes(minutes)}`);
       item.addEventListener("click", (event) => {
@@ -86,11 +101,7 @@ class MenuInjector {
       group.append(item);
     }
 
-    const foreverItem = templateItem.cloneNode(true);
-    foreverItem.classList.add("awaytimer-native-menu-item");
-    foreverItem.classList.remove("awaytimer-hidden-native-menu-item");
-    foreverItem.hidden = false;
-    foreverItem.removeAttribute("id");
+    const foreverItem = createClonedMenuItem(templateItem, "awaytimer-forever");
     foreverItem.setAttribute("data-awaytimer-forever", "true");
     replaceVisibleText(foreverItem, "Forever");
     foreverItem.addEventListener("click", (event) => {
@@ -103,6 +114,15 @@ class MenuInjector {
 
     return group;
   }
+}
+
+function createClonedMenuItem(templateItem, kind) {
+  const item = templateItem.cloneNode(true);
+  item.classList.add("awaytimer-native-menu-item", kind);
+  item.classList.remove("awaytimer-hidden-native-menu-item");
+  item.hidden = false;
+  item.removeAttribute("id");
+  return item;
 }
 
 function findCandidateMenus() {

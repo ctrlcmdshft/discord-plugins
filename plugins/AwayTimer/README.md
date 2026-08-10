@@ -8,6 +8,7 @@ AwayTimer is a focused BetterDiscord plugin that lets you choose when Discord sh
 - User-edited presets are saved and preserved across plugin updates.
 - Reset Presets button to return to Discord defaults.
 - Active timer indicator with a Cancel Timer button in settings.
+- Active timer indicator and Cancel Timer row inside Discord's Idle submenu.
 - Save feedback reports ignored invalid preset values.
 - A permanent Forever option at the bottom of the Idle menu that does not restore to Online.
 - Custom preset entries replace Discord's default native Idle duration choices.

@@ -107,6 +107,11 @@ module.exports = `
   cursor: pointer;
 }
 
+.awaytimer-active-timer {
+  color: var(--text-muted, inherit) !important;
+  cursor: default;
+}
+
 .awaytimer-hidden-native-menu-item {
   display: none !important;
 }
