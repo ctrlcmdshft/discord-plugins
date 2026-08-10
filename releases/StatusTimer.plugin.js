@@ -2,7 +2,7 @@
  * @name StatusTimer
  * @author ctrlcmdshft
  * @description Custom duration presets for Discord status timers.
- * @version 0.9.2
+ * @version 0.9.3
  */
 var __getOwnPropNames = Object.getOwnPropertyNames;
 var __commonJS = (cb, mod) => function __require() {
@@ -501,6 +501,7 @@ var require_settingsPanel = __commonJS({
       const root = document.createElement("div");
       root.className = "awaytimer-panel";
       let message = "";
+      const saveTimers = /* @__PURE__ */ new Map();
       const render = () => {
         const activeTimer = manualTimer.getActiveTimer();
         root.innerHTML = `
@@ -514,8 +515,7 @@ var require_settingsPanel = __commonJS({
         .awaytimer-note { color: var(--text-muted); font-size: 11px; line-height: 1.25; }
         .awaytimer-button { min-height: 24px; border: 0; border-radius: 5px; padding: 3px 7px; background: var(--brand-500, #5865f2); color: white; cursor: pointer; font-weight: 700; font-size: 11px; white-space: nowrap; }
         .awaytimer-button:hover { filter: brightness(1.08); }
-        .awaytimer-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 5px; align-items: center; }
-        .awaytimer-button.secondary { background: var(--brand-500, #5865f2); color: white; }
+        .awaytimer-actions { display: grid; grid-template-columns: 1fr; gap: 5px; align-items: center; }
         .awaytimer-button.neutral { background: var(--button-secondary-background, #4e5058); color: var(--button-secondary-text, #fff); }
         .awaytimer-field { display: grid; gap: 4px; }
         .awaytimer-input { width: 100%; box-sizing: border-box; border: 1px solid var(--brand-500, #5865f2); border-radius: 6px; padding: 6px 8px; background: var(--input-background, #1e1f22); color: var(--text-normal, #f2f3f5); font: inherit; font-size: 13px; box-shadow: inset 0 0 0 1px rgba(88, 101, 242, 0.25); }
@@ -532,7 +532,7 @@ var require_settingsPanel = __commonJS({
       </style>
       <div class="awaytimer-header">
         <div class="awaytimer-title">Status Timers</div>
-        <div class="awaytimer-note">Editable timed choices for Idle, Do Not Disturb, and Invisible. Forever is always included.</div>
+        <div class="awaytimer-note">Edits save automatically. Reset restores Discord's default times. Forever is always included.</div>
       </div>
       ${message ? `<div class="awaytimer-status">${escapeAttribute(message)}</div>` : ""}
       ${activeTimer ? renderActiveTimer(activeTimer) : ""}
@@ -546,15 +546,6 @@ var require_settingsPanel = __commonJS({
     `;
       };
       root.addEventListener("click", (event) => {
-        if (event.target.closest("[data-save-presets]")) {
-          const statusKind = event.target.closest("[data-save-presets]").dataset.statusKind;
-          const input = root.querySelector(`[data-preset-input="${statusKind}"]`);
-          const { presets, invalidCount } = parsePresetTextDetailed(input.value);
-          settings.set(`${statusKind}Presets`, presets);
-          message = `Saved ${labelStatusKind(statusKind)} presets.`;
-          if (invalidCount) message += ` Ignored ${invalidCount} invalid value${invalidCount === 1 ? "" : "s"}.`;
-          render();
-        }
         if (event.target.closest("[data-reset-presets]")) {
           const statusKind = event.target.closest("[data-reset-presets]").dataset.statusKind;
           settings.set(`${statusKind}Presets`, DEFAULT_SETTINGS[`${statusKind}Presets`]);
@@ -572,6 +563,19 @@ var require_settingsPanel = __commonJS({
           settings.set(key, !settings.get(key));
           render();
         }
+      });
+      root.addEventListener("input", (event) => {
+        const input = event.target.closest("[data-preset-input]");
+        if (!input) return;
+        const statusKind = input.dataset.presetInput;
+        window.clearTimeout(saveTimers.get(statusKind));
+        saveTimers.set(statusKind, window.setTimeout(() => {
+          const { presets, invalidCount } = parsePresetTextDetailed(input.value);
+          settings.set(`${statusKind}Presets`, presets);
+          message = `Saved ${labelStatusKind(statusKind)} presets.`;
+          if (invalidCount) message += ` Ignored ${invalidCount} invalid value${invalidCount === 1 ? "" : "s"}.`;
+          render();
+        }, 450));
       });
       render();
       return root;
@@ -596,8 +600,7 @@ var require_settingsPanel = __commonJS({
         <input class="awaytimer-input" data-preset-input="${escapeAttribute(statusKind)}" value="${escapeAttribute(presets.join(", "))}" />
       </div>
       <div class="awaytimer-actions">
-        <button class="awaytimer-button secondary" data-status-kind="${escapeAttribute(statusKind)}" data-save-presets>Save</button>
-        <button class="awaytimer-button neutral" data-status-kind="${escapeAttribute(statusKind)}" data-reset-presets>Reset</button>
+        <button class="awaytimer-button neutral" data-status-kind="${escapeAttribute(statusKind)}" data-reset-presets>Reset to Discord Defaults</button>
       </div>
     </div>
   `;
