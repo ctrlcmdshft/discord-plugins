@@ -84,7 +84,7 @@ class MenuInjector {
   decorateParentStatusItems() {
     const activeSubtitles = new Set();
 
-    for (const item of findParentStatusItems()) {
+    for (const item of findStatusSummaryItems()) {
       const statusKind = statusKindFromText(normalizeText(item.textContent));
       if (!["idle", "dnd", "invisible"].includes(statusKind)) continue;
 
@@ -182,17 +182,28 @@ function findCandidateMenus() {
     .filter((node) => !node.closest(".awaytimer-native-menu-group"));
 }
 
-function findParentStatusItems() {
+function findStatusSummaryItems() {
   return Array.from(document.querySelectorAll('[role="menuitem"], button, [class*="item"]'))
     .filter((node) => node instanceof HTMLElement)
     .filter((node) => !node.closest(".awaytimer-native-menu-group"))
     .filter((node) => !node.classList.contains("awaytimer-native-menu-item"))
     .filter((node) => !node.classList.contains("awaytimer-hidden-native-menu-item"))
+    .filter((node) => !isStatusChoiceMenu(node.closest('[role="menu"]')))
     .filter((node) => {
       const text = normalizeText(node.textContent);
       if (isNativeDurationLabel(text)) return false;
       return ["idle", "dnd", "invisible"].includes(statusKindFromText(text));
     });
+}
+
+function isStatusChoiceMenu(menu) {
+  if (!(menu instanceof HTMLElement)) return false;
+  const labels = new Set(
+    Array.from(menu.querySelectorAll('[role="menuitem"], button'))
+      .map((node) => statusKindFromText(normalizeText(node.textContent)))
+      .filter(Boolean)
+  );
+  return labels.has("idle") && labels.has("dnd") && labels.has("invisible");
 }
 
 function ensureParentStatusSubtitle(item) {

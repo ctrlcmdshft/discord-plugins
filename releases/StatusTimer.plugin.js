@@ -2,7 +2,7 @@
  * @name StatusTimer
  * @author ctrlcmdshft
  * @description Custom duration presets for Discord status timers.
- * @version 0.9.4
+ * @version 0.9.5
  */
 var __getOwnPropNames = Object.getOwnPropertyNames;
 var __commonJS = (cb, mod) => function __require() {
@@ -274,7 +274,7 @@ var require_menuInjector = __commonJS({
       }
       decorateParentStatusItems() {
         const activeSubtitles = /* @__PURE__ */ new Set();
-        for (const item of findParentStatusItems()) {
+        for (const item of findStatusSummaryItems()) {
           const statusKind = statusKindFromText(normalizeText(item.textContent));
           if (!["idle", "dnd", "invisible"].includes(statusKind)) continue;
           const activeTimer = this.manualTimer.getActiveTimer(statusKind);
@@ -356,12 +356,19 @@ var require_menuInjector = __commonJS({
     function findCandidateMenus() {
       return Array.from(document.querySelectorAll('[role="menu"]')).filter((node) => node instanceof HTMLElement).filter((node) => !node.closest(".awaytimer-native-menu-group"));
     }
-    function findParentStatusItems() {
-      return Array.from(document.querySelectorAll('[role="menuitem"], button, [class*="item"]')).filter((node) => node instanceof HTMLElement).filter((node) => !node.closest(".awaytimer-native-menu-group")).filter((node) => !node.classList.contains("awaytimer-native-menu-item")).filter((node) => !node.classList.contains("awaytimer-hidden-native-menu-item")).filter((node) => {
+    function findStatusSummaryItems() {
+      return Array.from(document.querySelectorAll('[role="menuitem"], button, [class*="item"]')).filter((node) => node instanceof HTMLElement).filter((node) => !node.closest(".awaytimer-native-menu-group")).filter((node) => !node.classList.contains("awaytimer-native-menu-item")).filter((node) => !node.classList.contains("awaytimer-hidden-native-menu-item")).filter((node) => !isStatusChoiceMenu(node.closest('[role="menu"]'))).filter((node) => {
         const text = normalizeText(node.textContent);
         if (isNativeDurationLabel(text)) return false;
         return ["idle", "dnd", "invisible"].includes(statusKindFromText(text));
       });
+    }
+    function isStatusChoiceMenu(menu) {
+      if (!(menu instanceof HTMLElement)) return false;
+      const labels = new Set(
+        Array.from(menu.querySelectorAll('[role="menuitem"], button')).map((node) => statusKindFromText(normalizeText(node.textContent))).filter(Boolean)
+      );
+      return labels.has("idle") && labels.has("dnd") && labels.has("invisible");
     }
     function ensureParentStatusSubtitle(item) {
       const existing = item.querySelector(".awaytimer-parent-subtitle");
