@@ -1,0 +1,13 @@
+{
+  "name": "discord-plugins",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Private BetterDiscord plugin workspace.",
+  "scripts": {
+    "build": "npm --prefix plugins/AwayTimer run build && npm --prefix plugins/CommandCenter run build && npm run sync:releases",
+    "test": "npm --prefix plugins/AwayTimer test && npm --prefix plugins/CommandCenter test",
+    "sync:releases": "cp plugins/AwayTimer/dist/AwayTimer.plugin.js releases/AwayTimer.plugin.js && cp plugins/CommandCenter/dist/CommandCenter.plugin.js releases/CommandCenter.plugin.js"
+  },
+  "author": "ctrlcmdshft",
+  "license": "MIT"
+}
