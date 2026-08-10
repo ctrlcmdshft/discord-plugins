@@ -43,7 +43,7 @@ function createSettingsPanel({settings, manualTimer}) {
       </style>
       <div class="awaytimer-header">
         <div class="awaytimer-title">Status Timers</div>
-        <div class="awaytimer-note">Editable timed choices for Idle, Do Not Disturb, and Invisible.</div>
+        <div class="awaytimer-note">Editable timed choices for Idle, Do Not Disturb, and Invisible. Forever is always included.</div>
       </div>
       ${message ? `<div class="awaytimer-status">${escapeAttribute(message)}</div>` : ""}
       ${activeTimer ? renderActiveTimer(activeTimer) : ""}

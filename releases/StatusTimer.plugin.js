@@ -2,7 +2,7 @@
  * @name StatusTimer
  * @author ctrlcmdshft
  * @description Custom duration presets for Discord status timers.
- * @version 0.9.1
+ * @version 0.9.2
  */
 var __getOwnPropNames = Object.getOwnPropertyNames;
 var __commonJS = (cb, mod) => function __require() {
@@ -532,7 +532,7 @@ var require_settingsPanel = __commonJS({
       </style>
       <div class="awaytimer-header">
         <div class="awaytimer-title">Status Timers</div>
-        <div class="awaytimer-note">Editable timed choices for Idle, Do Not Disturb, and Invisible.</div>
+        <div class="awaytimer-note">Editable timed choices for Idle, Do Not Disturb, and Invisible. Forever is always included.</div>
       </div>
       ${message ? `<div class="awaytimer-status">${escapeAttribute(message)}</div>` : ""}
       ${activeTimer ? renderActiveTimer(activeTimer) : ""}
