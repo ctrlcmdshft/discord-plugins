@@ -241,7 +241,7 @@ var require_menuInjector = __commonJS({
       }
     };
     function findCandidateMenus() {
-      return Array.from(document.querySelectorAll('[role="menu"], [class*="menu"]')).filter((node) => node instanceof HTMLElement);
+      return Array.from(document.querySelectorAll('[role="menu"]')).filter((node) => node instanceof HTMLElement).filter((node) => !node.closest(".awaytimer-native-menu-group"));
     }
     function getNativeIdleDurationItems(menu) {
       const labels = [
@@ -253,7 +253,7 @@ var require_menuInjector = __commonJS({
         "Forever"
       ];
       const labelSet = new Set(labels);
-      return Array.from(menu.querySelectorAll('[role="menuitem"], button, [class*="item"]')).filter((node) => node instanceof HTMLElement).filter((node) => labelSet.has(normalizeText(node.textContent)));
+      return Array.from(menu.querySelectorAll('[role="menuitem"], button')).filter((node) => node instanceof HTMLElement).filter((node) => !node.classList.contains("awaytimer-native-menu-item")).filter((node) => !node.closest(".awaytimer-native-menu-group")).filter((node) => !node.classList.contains("awaytimer-hidden-native-menu-item")).filter((node) => labelSet.has(normalizeText(node.textContent)));
     }
     function replaceVisibleText(node, label) {
       const walker = document.createTreeWalker(node, NodeFilter.SHOW_TEXT);

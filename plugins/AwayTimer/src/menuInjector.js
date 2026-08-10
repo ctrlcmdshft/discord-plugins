@@ -106,8 +106,9 @@ class MenuInjector {
 }
 
 function findCandidateMenus() {
-  return Array.from(document.querySelectorAll('[role="menu"], [class*="menu"]'))
-    .filter((node) => node instanceof HTMLElement);
+  return Array.from(document.querySelectorAll('[role="menu"]'))
+    .filter((node) => node instanceof HTMLElement)
+    .filter((node) => !node.closest(".awaytimer-native-menu-group"));
 }
 
 function getNativeIdleDurationItems(menu) {
@@ -121,8 +122,11 @@ function getNativeIdleDurationItems(menu) {
   ];
   const labelSet = new Set(labels);
 
-  return Array.from(menu.querySelectorAll('[role="menuitem"], button, [class*="item"]'))
+  return Array.from(menu.querySelectorAll('[role="menuitem"], button'))
     .filter((node) => node instanceof HTMLElement)
+    .filter((node) => !node.classList.contains("awaytimer-native-menu-item"))
+    .filter((node) => !node.closest(".awaytimer-native-menu-group"))
+    .filter((node) => !node.classList.contains("awaytimer-hidden-native-menu-item"))
     .filter((node) => labelSet.has(normalizeText(node.textContent)));
 }
 
