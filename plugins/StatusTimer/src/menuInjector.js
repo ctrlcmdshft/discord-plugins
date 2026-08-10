@@ -188,7 +188,7 @@ function findStatusSummaryItems() {
     .filter((node) => !node.closest(".awaytimer-native-menu-group"))
     .filter((node) => !node.classList.contains("awaytimer-native-menu-item"))
     .filter((node) => !node.classList.contains("awaytimer-hidden-native-menu-item"))
-    .filter((node) => isAccountStatusMenu(node.closest('[role="menu"]')))
+    .filter((node) => isInAccountStatusPopout(node))
     .filter((node) => {
       const text = normalizeText(node.textContent);
       if (isNativeDurationLabel(text)) return false;
@@ -196,10 +196,18 @@ function findStatusSummaryItems() {
     });
 }
 
-function isAccountStatusMenu(menu) {
-  if (!(menu instanceof HTMLElement)) return false;
-  const text = normalizeText(menu.textContent);
-  return text.includes("Edit Profile") && text.includes("Clips");
+function isInAccountStatusPopout(node) {
+  let current = node.parentElement;
+  let depth = 0;
+
+  while (current && current !== document.body && depth < 10) {
+    const text = normalizeText(current.textContent);
+    if (text.includes("Edit Profile") && text.includes("Clips")) return true;
+    current = current.parentElement;
+    depth += 1;
+  }
+
+  return false;
 }
 
 function ensureParentStatusSubtitle(item) {
