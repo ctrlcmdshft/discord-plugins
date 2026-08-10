@@ -32,6 +32,7 @@ class MenuInjector {
       node.classList.remove("awaytimer-hidden-native-menu-item");
       node.hidden = false;
     }
+    removeParentStatusSubtitles();
   }
 
   refresh() {
@@ -42,6 +43,7 @@ class MenuInjector {
       node.classList.remove("awaytimer-hidden-native-menu-item");
       node.hidden = false;
     }
+    removeParentStatusSubtitles();
     this.scheduleInject();
   }
 
@@ -50,6 +52,7 @@ class MenuInjector {
     this.pending = true;
     requestAnimationFrame(() => {
       this.pending = false;
+      this.decorateParentStatusItems();
       this.injectIntoDurationMenus();
     });
   }
@@ -75,6 +78,23 @@ class MenuInjector {
         item.classList.add("awaytimer-hidden-native-menu-item");
         item.hidden = true;
       }
+    }
+  }
+
+  decorateParentStatusItems() {
+    removeParentStatusSubtitles();
+
+    for (const item of findParentStatusItems()) {
+      const statusKind = statusKindFromText(normalizeText(item.textContent));
+      if (statusKind !== "idle" && statusKind !== "dnd") continue;
+
+      const activeTimer = this.manualTimer.getActiveTimer(statusKind);
+      if (!activeTimer) continue;
+
+      const subtitle = document.createElement("div");
+      subtitle.className = "awaytimer-parent-subtitle";
+      subtitle.textContent = `Until ${formatClockTime(activeTimer.expiresAt)}`;
+      appendSubtitle(item, subtitle);
     }
   }
 
@@ -185,6 +205,41 @@ function findCandidateMenus() {
     .filter((node) => !node.closest(".awaytimer-native-menu-group"));
 }
 
+function findParentStatusItems() {
+  return Array.from(document.querySelectorAll('[role="menuitem"], button, [class*="item"]'))
+    .filter((node) => node instanceof HTMLElement)
+    .filter((node) => !node.closest(".awaytimer-native-menu-group"))
+    .filter((node) => {
+      const statusKind = statusKindFromText(normalizeText(node.textContent));
+      return statusKind === "idle" || statusKind === "dnd" || statusKind === "unsupported";
+    });
+}
+
+function appendSubtitle(item, subtitle) {
+  const existingTextNodes = Array.from(item.childNodes).filter((node) => node.nodeType === Node.TEXT_NODE);
+  if (existingTextNodes.length) {
+    item.append(subtitle);
+    return;
+  }
+
+  const textContainer = findBestTextContainer(item);
+  textContainer.append(subtitle);
+}
+
+function findBestTextContainer(item) {
+  const children = Array.from(item.querySelectorAll("div, span"))
+    .filter((node) => !node.querySelector(".awaytimer-parent-subtitle"))
+    .filter((node) => normalizeText(node.textContent));
+
+  return children.sort((first, second) => normalizeText(first.textContent).length - normalizeText(second.textContent).length)[0] || item;
+}
+
+function removeParentStatusSubtitles() {
+  for (const node of document.querySelectorAll(".awaytimer-parent-subtitle")) {
+    node.remove();
+  }
+}
+
 function getNativeIdleDurationItems(menu) {
   const labels = [
     "For 15 Minutes",
@@ -236,5 +291,6 @@ function closeDiscordMenu() {
 module.exports = {
   MenuInjector,
   inferStatusKind,
+  removeParentStatusSubtitles,
   statusKindFromText
 };

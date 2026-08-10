@@ -1,6 +1,6 @@
 const test = require("node:test");
 const assert = require("node:assert/strict");
-const {inferStatusKind, statusKindFromText} = require("../src/menuInjector");
+const {inferStatusKind, removeParentStatusSubtitles, statusKindFromText} = require("../src/menuInjector");
 
 test("inferStatusKind blocks unsupported status menus", () => {
   global.document = {
@@ -36,4 +36,14 @@ test("inferStatusKind prefers expanded status item over stale fallback", () => {
   };
 
   assert.equal(inferStatusKind({contains: () => false}, "idle"), null);
+});
+
+test("removeParentStatusSubtitles removes existing subtitles", () => {
+  let removed = false;
+  global.document = {
+    querySelectorAll: () => [{remove: () => { removed = true; }}],
+  };
+
+  removeParentStatusSubtitles();
+  assert.equal(removed, true);
 });

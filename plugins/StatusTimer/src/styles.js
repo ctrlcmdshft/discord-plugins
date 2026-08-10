@@ -12,6 +12,15 @@ module.exports = `
   cursor: default;
 }
 
+.awaytimer-parent-subtitle {
+  color: var(--text-muted, #6d6f78);
+  font-size: 12px;
+  font-weight: 500;
+  line-height: 16px;
+  margin-top: 1px;
+  pointer-events: none;
+}
+
 .awaytimer-hidden-native-menu-item {
   display: none !important;
 }
