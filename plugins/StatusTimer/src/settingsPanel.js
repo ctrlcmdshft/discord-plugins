@@ -35,8 +35,8 @@ function createSettingsPanel({settings, manualTimer}) {
         <div class="awaytimer-note">Replace Discord's timed status choices with editable presets for Idle and Do Not Disturb.</div>
         ${activeTimer ? renderActiveTimer(activeTimer) : ""}
       </div>
-      ${renderPresetSection("idle", "Idle Presets", settings.get("idlePresets"))}
-      ${renderPresetSection("dnd", "Do Not Disturb Presets", settings.get("dndPresets"))}
+      ${renderPresetSection("idle", "Idle Presets", settings.get("idlePresets"), message)}
+      ${renderPresetSection("dnd", "Do Not Disturb Presets", settings.get("dndPresets"), message)}
       <div class="awaytimer-section">
         ${renderSwitch("restoreManualTimersToOnline", "Timers Return To Online", "When a custom status timer ends, set your status back to Online instead of restoring the previous status.", settings.get("restoreManualTimersToOnline"))}
         ${renderSwitch("showToasts", "Show Toasts", "Shows a small notice when StatusTimer changes your status.", settings.get("showToasts"))}
@@ -96,7 +96,7 @@ function renderActiveTimer(activeTimer) {
   `;
 }
 
-function renderPresetSection(statusKind, title, presets) {
+function renderPresetSection(statusKind, title, presets, message) {
   return `
     <div class="awaytimer-section">
       <div class="awaytimer-field">

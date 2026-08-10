@@ -474,7 +474,7 @@ var require_settingsPanel = __commonJS({
     function createSettingsPanel2({ settings, manualTimer }) {
       const root = document.createElement("div");
       root.className = "awaytimer-panel";
-      let message2 = "";
+      let message = "";
       const render = () => {
         const activeTimer = manualTimer.getActiveTimer();
         root.innerHTML = `
@@ -504,8 +504,8 @@ var require_settingsPanel = __commonJS({
         <div class="awaytimer-note">Replace Discord's timed status choices with editable presets for Idle and Do Not Disturb.</div>
         ${activeTimer ? renderActiveTimer(activeTimer) : ""}
       </div>
-      ${renderPresetSection("idle", "Idle Presets", settings.get("idlePresets"))}
-      ${renderPresetSection("dnd", "Do Not Disturb Presets", settings.get("dndPresets"))}
+      ${renderPresetSection("idle", "Idle Presets", settings.get("idlePresets"), message)}
+      ${renderPresetSection("dnd", "Do Not Disturb Presets", settings.get("dndPresets"), message)}
       <div class="awaytimer-section">
         ${renderSwitch("restoreManualTimersToOnline", "Timers Return To Online", "When a custom status timer ends, set your status back to Online instead of restoring the previous status.", settings.get("restoreManualTimersToOnline"))}
         ${renderSwitch("showToasts", "Show Toasts", "Shows a small notice when StatusTimer changes your status.", settings.get("showToasts"))}
@@ -520,19 +520,19 @@ var require_settingsPanel = __commonJS({
           const input = root.querySelector(`[data-preset-input="${statusKind}"]`);
           const { presets, invalidCount } = parsePresetTextDetailed(input.value);
           settings.set(`${statusKind}Presets`, presets);
-          message2 = `Saved ${labelStatusKind(statusKind)} presets.`;
-          if (invalidCount) message2 += ` Ignored ${invalidCount} invalid value${invalidCount === 1 ? "" : "s"}.`;
+          message = `Saved ${labelStatusKind(statusKind)} presets.`;
+          if (invalidCount) message += ` Ignored ${invalidCount} invalid value${invalidCount === 1 ? "" : "s"}.`;
           render();
         }
         if (event.target.closest("[data-reset-presets]")) {
           const statusKind = event.target.closest("[data-reset-presets]").dataset.statusKind;
           settings.set(`${statusKind}Presets`, DEFAULT_SETTINGS[`${statusKind}Presets`]);
-          message2 = `Reset ${labelStatusKind(statusKind)} presets to Discord defaults.`;
+          message = `Reset ${labelStatusKind(statusKind)} presets to Discord defaults.`;
           render();
         }
         if (event.target.closest("[data-cancel-timer]")) {
           manualTimer.cancel({ restore: true });
-          message2 = "Cancelled active timer.";
+          message = "Cancelled active timer.";
           render();
         }
         const switchButton = event.target.closest("[data-toggle-setting]");
@@ -557,7 +557,7 @@ var require_settingsPanel = __commonJS({
     </div>
   `;
     }
-    function renderPresetSection(statusKind, title, presets) {
+    function renderPresetSection(statusKind, title, presets, message) {
       return `
     <div class="awaytimer-section">
       <div class="awaytimer-field">
@@ -715,14 +715,14 @@ var StatusTimer = class {
       }
     });
     this.statusAdapter = new StatusAdapter({
-      logger: (message2, level) => this.log(message2, level)
+      logger: (message, level) => this.log(message, level)
     });
     this.statusAdapter.start();
     this.manualTimer = new ManualStatusTimer({
       settings: this.settings,
       statusAdapter: this.statusAdapter,
-      notify: (message2) => this.notify(message2),
-      logger: (message2, level) => this.log(message2, level)
+      notify: (message) => this.notify(message),
+      logger: (message, level) => this.log(message, level)
     });
     this.manualTimer.start();
     this.menuInjector = new MenuInjector({
@@ -749,13 +749,13 @@ var StatusTimer = class {
       manualTimer: this.manualTimer
     });
   }
-  notify(message2) {
+  notify(message) {
     if (this.settings?.get("showToasts") === false) return;
-    BdApi.UI?.showToast?.(message2);
+    BdApi.UI?.showToast?.(message);
   }
-  log(message2, level = "debug") {
+  log(message, level = "debug") {
     const logger = level === "warn" ? console.warn : console.debug;
-    logger(`[${this.meta.name}] ${message2}`);
+    logger(`[${this.meta.name}] ${message}`);
   }
 };
 module.exports = StatusTimer;
