@@ -73,6 +73,17 @@ class ManualStatusTimer {
     this.notify("AwayTimer manual timer cancelled.");
   }
 
+  getActiveTimer() {
+    const active = BdApi.Data.load(PLUGIN_NAME, ACTIVE_TIMER_KEY);
+    if (!active?.expiresAt) return null;
+    if (active.expiresAt <= Date.now()) return null;
+
+    return {
+      ...active,
+      remainingMs: active.expiresAt - Date.now()
+    };
+  }
+
   resumeActiveTimer() {
     const active = BdApi.Data.load(PLUGIN_NAME, ACTIVE_TIMER_KEY);
     if (!active?.expiresAt) return;
@@ -140,12 +151,20 @@ function formatMinutes(minutes) {
   return `${hours}h ${remainder}m`;
 }
 
+function formatClockTime(timestamp) {
+  return new Date(timestamp).toLocaleTimeString([], {
+    hour: "numeric",
+    minute: "2-digit"
+  });
+}
+
 function humanStatus(status) {
   return status.charAt(0).toUpperCase() + status.slice(1);
 }
 
 module.exports = {
   ManualStatusTimer,
+  formatClockTime,
   formatMinutes,
   nextTimeTodayOrTomorrow
 };

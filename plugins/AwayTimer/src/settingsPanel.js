@@ -1,5 +1,5 @@
-const {DEFAULT_SETTINGS, parsePresetText} = require("./settings");
-const {formatMinutes} = require("./manualStatusTimer");
+const {DEFAULT_SETTINGS, parsePresetTextDetailed} = require("./settings");
+const {formatClockTime, formatMinutes} = require("./manualStatusTimer");
 
 function createSettingsPanel({settings, manualTimer}) {
   const root = document.createElement("div");
@@ -7,6 +7,7 @@ function createSettingsPanel({settings, manualTimer}) {
   let message = "";
 
   const render = () => {
+    const activeTimer = manualTimer.getActiveTimer();
     root.innerHTML = `
       <style>
         .awaytimer-panel { color: var(--text-normal); display: grid; gap: 22px; padding: 8px 0; }
@@ -22,6 +23,7 @@ function createSettingsPanel({settings, manualTimer}) {
         .awaytimer-field { display: grid; gap: 6px; }
         .awaytimer-input { width: min(520px, 100%); box-sizing: border-box; border: 1px solid var(--background-modifier-accent); border-radius: 6px; padding: 10px 12px; background: var(--input-background); color: var(--text-normal); font: inherit; font-size: 15px; }
         .awaytimer-status { min-height: 18px; color: var(--text-positive, #23a55a); font-size: 13px; font-weight: 600; }
+        .awaytimer-active { display: grid; gap: 10px; padding: 12px; border-radius: 6px; background: var(--background-secondary, rgba(255, 255, 255, 0.04)); }
         .awaytimer-setting { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 18px; align-items: center; padding-top: 4px; }
         .awaytimer-switch { position: relative; width: 42px; height: 24px; border: 0; border-radius: 999px; background: var(--background-modifier-accent, #4e5058); cursor: pointer; }
         .awaytimer-switch::after { content: ""; position: absolute; top: 3px; left: 3px; width: 18px; height: 18px; border-radius: 50%; background: #fff; transition: transform 140ms ease; }
@@ -31,6 +33,7 @@ function createSettingsPanel({settings, manualTimer}) {
       <div class="awaytimer-section">
         <div class="awaytimer-title">Custom Idle Timers</div>
         <div class="awaytimer-note">Set Idle for your own durations instead of Discord's fixed 15m, 1h, 8h, 24h, 3d, and Forever choices.</div>
+        ${activeTimer ? renderActiveTimer(activeTimer) : ""}
         <div class="awaytimer-buttons">
           ${settings.get("manualPresets").map((minutes) => `
             <button class="awaytimer-button" data-minutes="${minutes}">${formatMinutes(minutes)}</button>
@@ -63,9 +66,10 @@ function createSettingsPanel({settings, manualTimer}) {
 
     if (event.target.closest("[data-save-presets]")) {
       const input = root.querySelector("#awaytimer-presets");
-      const presets = parsePresetText(input.value);
+      const {presets, invalidCount} = parsePresetTextDetailed(input.value);
       settings.set("manualPresets", presets);
       message = `Saved ${presets.length} preset${presets.length === 1 ? "" : "s"}.`;
+      if (invalidCount) message += ` Ignored ${invalidCount} invalid value${invalidCount === 1 ? "" : "s"}.`;
       render();
     }
 
@@ -75,7 +79,11 @@ function createSettingsPanel({settings, manualTimer}) {
       render();
     }
 
-    if (event.target.closest("[data-cancel-timer]")) manualTimer.cancel({restore: true});
+    if (event.target.closest("[data-cancel-timer]")) {
+      manualTimer.cancel({restore: true});
+      message = "Cancelled active timer.";
+      render();
+    }
 
     const switchButton = event.target.closest("[data-toggle-setting]");
     if (switchButton) {
@@ -87,6 +95,19 @@ function createSettingsPanel({settings, manualTimer}) {
 
   render();
   return root;
+}
+
+function renderActiveTimer(activeTimer) {
+  const remainingMinutes = Math.max(1, Math.ceil(activeTimer.remainingMs / 60000));
+  return `
+    <div class="awaytimer-active">
+      <div>
+        <div class="awaytimer-title">Active Timer</div>
+        <div class="awaytimer-note">Idle until ${escapeAttribute(formatClockTime(activeTimer.expiresAt))}. About ${escapeAttribute(formatMinutes(remainingMinutes))} remaining.</div>
+      </div>
+      <button class="awaytimer-button neutral" data-cancel-timer>Cancel Timer</button>
+    </div>
+  `;
 }
 
 function renderSwitch(id, title, note, enabled) {

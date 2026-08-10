@@ -1,6 +1,6 @@
 const test = require("node:test");
 const assert = require("node:assert/strict");
-const {normalizeSettings} = require("../src/settings");
+const {normalizeSettings, parsePresetTextDetailed} = require("../src/settings");
 
 test("normalizeSettings keeps valid values", () => {
   assert.deepEqual(normalizeSettings({
@@ -40,4 +40,11 @@ test("normalizeSettings falls back for invalid custom duration", () => {
   });
 
   assert.equal(settings.customDurationMinutes, 30);
+});
+
+test("parsePresetTextDetailed reports invalid values", () => {
+  assert.deepEqual(parsePresetTextDetailed("abc, 15, -1, 60, 5000"), {
+    presets: [15, 60],
+    invalidCount: 3
+  });
 });

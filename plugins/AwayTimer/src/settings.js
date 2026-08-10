@@ -31,6 +31,27 @@ function parsePresetText(value) {
   return normalizePresets(String(value).split(/[\s,]+/));
 }
 
+function parsePresetTextDetailed(value) {
+  const parts = String(value).split(/[\s,]+/).filter(Boolean);
+  const valid = [];
+  const invalid = [];
+
+  for (const part of parts) {
+    const number = Number(part);
+    const minutes = Math.round(number);
+    if (!Number.isFinite(number) || minutes <= 0 || minutes > 4320) {
+      invalid.push(part);
+      continue;
+    }
+    valid.push(minutes);
+  }
+
+  return {
+    presets: normalizePresets(valid),
+    invalidCount: invalid.length
+  };
+}
+
 function clampNumber(value, fallback, min, max) {
   const number = Number(value);
   if (!Number.isFinite(number)) return fallback;
@@ -91,5 +112,6 @@ module.exports = {
   DEFAULT_SETTINGS,
   SettingsStore,
   normalizeSettings,
-  parsePresetText
+  parsePresetText,
+  parsePresetTextDetailed
 };
