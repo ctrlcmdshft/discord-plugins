@@ -2,7 +2,7 @@
  * @name StatusTimer
  * @author ctrlcmdshft
  * @description Custom duration presets for Discord status timers.
- * @version 0.8.0
+ * @version 0.8.1
  */
 var __getOwnPropNames = Object.getOwnPropertyNames;
 var __commonJS = (cb, mod) => function __require() {
@@ -193,7 +193,7 @@ var require_menuInjector = __commonJS({
         this.manualTimer = manualTimer;
         this.observer = null;
         this.pending = false;
-        this.lastStatusKind = "idle";
+        this.lastStatusKind = null;
         this.handlePointerOver = this.handlePointerOver.bind(this);
       }
       start() {
@@ -242,6 +242,8 @@ var require_menuInjector = __commonJS({
         const text = normalizeText(item.textContent);
         if (text.startsWith("Idle")) this.lastStatusKind = "idle";
         if (text.startsWith("Do Not Disturb")) this.lastStatusKind = "dnd";
+        if (text.startsWith("Invisible")) this.lastStatusKind = "unsupported";
+        if (text.startsWith("Online")) this.lastStatusKind = "unsupported";
       }
       injectIntoDurationMenus() {
         for (const menu of findCandidateMenus()) {
@@ -250,6 +252,7 @@ var require_menuInjector = __commonJS({
           if (!nativeItems.length) continue;
           const firstNativeItem = nativeItems[0];
           const statusKind = inferStatusKind(menu, this.lastStatusKind);
+          if (!statusKind) continue;
           firstNativeItem.before(this.createMenuGroup(firstNativeItem, statusKind));
           for (const item of nativeItems) {
             item.classList.add("awaytimer-hidden-native-menu-item");
@@ -304,10 +307,11 @@ var require_menuInjector = __commonJS({
       }
     };
     function inferStatusKind(menu, fallback) {
+      if (fallback !== "idle" && fallback !== "dnd") return null;
       const rootMenuText = Array.from(document.querySelectorAll('[role="menu"]')).filter((node) => node !== menu).map((node) => normalizeText(node.textContent)).join(" ");
       if (rootMenuText.includes("Do Not Disturb") && fallback === "dnd") return "dnd";
       if (rootMenuText.includes("Idle") && fallback === "idle") return "idle";
-      return fallback === "dnd" ? "dnd" : "idle";
+      return null;
     }
     function createClonedMenuItem(templateItem, kind) {
       const item = templateItem.cloneNode(true);
@@ -357,7 +361,8 @@ var require_menuInjector = __commonJS({
       }));
     }
     module2.exports = {
-      MenuInjector: MenuInjector2
+      MenuInjector: MenuInjector2,
+      inferStatusKind
     };
   }
 });

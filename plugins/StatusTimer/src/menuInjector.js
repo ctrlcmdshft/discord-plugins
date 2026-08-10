@@ -6,7 +6,7 @@ class MenuInjector {
     this.manualTimer = manualTimer;
     this.observer = null;
     this.pending = false;
-    this.lastStatusKind = "idle";
+    this.lastStatusKind = null;
     this.handlePointerOver = this.handlePointerOver.bind(this);
   }
 
@@ -60,6 +60,8 @@ class MenuInjector {
     const text = normalizeText(item.textContent);
     if (text.startsWith("Idle")) this.lastStatusKind = "idle";
     if (text.startsWith("Do Not Disturb")) this.lastStatusKind = "dnd";
+    if (text.startsWith("Invisible")) this.lastStatusKind = "unsupported";
+    if (text.startsWith("Online")) this.lastStatusKind = "unsupported";
   }
 
   injectIntoDurationMenus() {
@@ -69,6 +71,7 @@ class MenuInjector {
       if (!nativeItems.length) continue;
       const firstNativeItem = nativeItems[0];
       const statusKind = inferStatusKind(menu, this.lastStatusKind);
+      if (!statusKind) continue;
       firstNativeItem.before(this.createMenuGroup(firstNativeItem, statusKind));
       for (const item of nativeItems) {
         item.classList.add("awaytimer-hidden-native-menu-item");
@@ -130,6 +133,8 @@ class MenuInjector {
 }
 
 function inferStatusKind(menu, fallback) {
+  if (fallback !== "idle" && fallback !== "dnd") return null;
+
   const rootMenuText = Array.from(document.querySelectorAll('[role="menu"]'))
     .filter((node) => node !== menu)
     .map((node) => normalizeText(node.textContent))
@@ -137,7 +142,7 @@ function inferStatusKind(menu, fallback) {
 
   if (rootMenuText.includes("Do Not Disturb") && fallback === "dnd") return "dnd";
   if (rootMenuText.includes("Idle") && fallback === "idle") return "idle";
-  return fallback === "dnd" ? "dnd" : "idle";
+  return null;
 }
 
 function createClonedMenuItem(templateItem, kind) {
@@ -204,5 +209,6 @@ function closeDiscordMenu() {
 }
 
 module.exports = {
-  MenuInjector
+  MenuInjector,
+  inferStatusKind
 };
