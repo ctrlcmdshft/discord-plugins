@@ -110,7 +110,7 @@ class ManualStatusTimer {
 function clampMinutes(minutes) {
   const value = Math.round(Number(minutes));
   if (!Number.isFinite(value)) return 30;
-  return Math.min(Math.max(value, 1), 1440);
+  return Math.min(Math.max(value, 1), 4320);
 }
 
 function nextTimeTodayOrTomorrow(timeValue) {
@@ -128,9 +128,14 @@ function nextTimeTodayOrTomorrow(timeValue) {
 }
 
 function formatMinutes(minutes) {
-  if (minutes < 60) return `${minutes} minute${minutes === 1 ? "" : "s"}`;
-  const hours = Math.floor(minutes / 60);
-  const remainder = minutes % 60;
+  const totalMinutes = Number(minutes);
+  if (totalMinutes < 60) return `${totalMinutes} minute${totalMinutes === 1 ? "" : "s"}`;
+  if (totalMinutes % 1440 === 0) {
+    const days = totalMinutes / 1440;
+    return `${days} day${days === 1 ? "" : "s"}`;
+  }
+  const hours = Math.floor(totalMinutes / 60);
+  const remainder = totalMinutes % 60;
   if (!remainder) return `${hours} hour${hours === 1 ? "" : "s"}`;
   return `${hours}h ${remainder}m`;
 }

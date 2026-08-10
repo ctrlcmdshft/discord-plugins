@@ -1,6 +1,6 @@
 {
   "name": "betterdiscord-away-timer",
-  "version": "0.3.0",
+  "version": "0.4.0",
   "description": "Configurable away/idle timer for BetterDiscord.",
   "private": true,
   "main": "dist/AwayTimer.plugin.js",

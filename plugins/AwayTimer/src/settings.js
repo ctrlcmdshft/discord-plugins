@@ -1,7 +1,7 @@
 const PLUGIN_NAME = "AwayTimer";
 
 const DEFAULT_SETTINGS = Object.freeze({
-  manualPresets: [20, 45, 120, 240, 1440],
+  manualPresets: [15, 60, 480, 1440, 4320],
   customDurationMinutes: 30,
   restoreManualTimersToOnline: true,
   showQuickButton: false,
@@ -11,7 +11,7 @@ const DEFAULT_SETTINGS = Object.freeze({
 function normalizeSettings(value = {}) {
   return {
     manualPresets: normalizePresets(value.manualPresets),
-    customDurationMinutes: clampNumber(value.customDurationMinutes, DEFAULT_SETTINGS.customDurationMinutes, 1, 1440),
+    customDurationMinutes: clampNumber(value.customDurationMinutes, DEFAULT_SETTINGS.customDurationMinutes, 1, 4320),
     restoreManualTimersToOnline: value.restoreManualTimersToOnline !== undefined ? Boolean(value.restoreManualTimersToOnline) : DEFAULT_SETTINGS.restoreManualTimersToOnline,
     showQuickButton: value.showQuickButton !== undefined ? Boolean(value.showQuickButton) : DEFAULT_SETTINGS.showQuickButton,
     showToasts: value.showToasts !== undefined ? Boolean(value.showToasts) : DEFAULT_SETTINGS.showToasts
@@ -22,7 +22,7 @@ function normalizePresets(value) {
   const presets = Array.isArray(value) ? value : DEFAULT_SETTINGS.manualPresets;
   const normalized = presets
     .map((item) => Math.round(Number(item)))
-    .filter((item) => Number.isFinite(item) && item > 0 && item <= 1440);
+    .filter((item) => Number.isFinite(item) && item > 0 && item <= 4320);
 
   return Array.from(new Set(normalized)).slice(0, 12);
 }

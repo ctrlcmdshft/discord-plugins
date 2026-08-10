@@ -2,7 +2,7 @@
  * @name AwayTimer
  * @author ctrlcmdshft
  * @description Choose exactly when Discord should show you as away/idle.
- * @version 0.3.0
+ * @version 0.4.0
  */
 var __getOwnPropNames = Object.getOwnPropertyNames;
 var __commonJS = (cb, mod) => function __require() {
@@ -110,7 +110,7 @@ var require_manualStatusTimer = __commonJS({
     function clampMinutes(minutes) {
       const value = Math.round(Number(minutes));
       if (!Number.isFinite(value)) return 30;
-      return Math.min(Math.max(value, 1), 1440);
+      return Math.min(Math.max(value, 1), 4320);
     }
     function nextTimeTodayOrTomorrow(timeValue) {
       const match = String(timeValue || "").match(/^(\d{1,2}):(\d{2})$/);
@@ -124,9 +124,14 @@ var require_manualStatusTimer = __commonJS({
       return target.getTime();
     }
     function formatMinutes(minutes) {
-      if (minutes < 60) return `${minutes} minute${minutes === 1 ? "" : "s"}`;
-      const hours = Math.floor(minutes / 60);
-      const remainder = minutes % 60;
+      const totalMinutes = Number(minutes);
+      if (totalMinutes < 60) return `${totalMinutes} minute${totalMinutes === 1 ? "" : "s"}`;
+      if (totalMinutes % 1440 === 0) {
+        const days = totalMinutes / 1440;
+        return `${days} day${days === 1 ? "" : "s"}`;
+      }
+      const hours = Math.floor(totalMinutes / 60);
+      const remainder = totalMinutes % 60;
       if (!remainder) return `${hours} hour${hours === 1 ? "" : "s"}`;
       return `${hours}h ${remainder}m`;
     }
@@ -408,7 +413,7 @@ var require_settings = __commonJS({
   "src/settings.js"(exports2, module2) {
     var PLUGIN_NAME = "AwayTimer";
     var DEFAULT_SETTINGS = Object.freeze({
-      manualPresets: [20, 45, 120, 240, 1440],
+      manualPresets: [15, 60, 480, 1440, 4320],
       customDurationMinutes: 30,
       restoreManualTimersToOnline: true,
       showQuickButton: false,
@@ -417,7 +422,7 @@ var require_settings = __commonJS({
     function normalizeSettings(value = {}) {
       return {
         manualPresets: normalizePresets(value.manualPresets),
-        customDurationMinutes: clampNumber(value.customDurationMinutes, DEFAULT_SETTINGS.customDurationMinutes, 1, 1440),
+        customDurationMinutes: clampNumber(value.customDurationMinutes, DEFAULT_SETTINGS.customDurationMinutes, 1, 4320),
         restoreManualTimersToOnline: value.restoreManualTimersToOnline !== void 0 ? Boolean(value.restoreManualTimersToOnline) : DEFAULT_SETTINGS.restoreManualTimersToOnline,
         showQuickButton: value.showQuickButton !== void 0 ? Boolean(value.showQuickButton) : DEFAULT_SETTINGS.showQuickButton,
         showToasts: value.showToasts !== void 0 ? Boolean(value.showToasts) : DEFAULT_SETTINGS.showToasts
@@ -425,7 +430,7 @@ var require_settings = __commonJS({
     }
     function normalizePresets(value) {
       const presets = Array.isArray(value) ? value : DEFAULT_SETTINGS.manualPresets;
-      const normalized = presets.map((item) => Math.round(Number(item))).filter((item) => Number.isFinite(item) && item > 0 && item <= 1440);
+      const normalized = presets.map((item) => Math.round(Number(item))).filter((item) => Number.isFinite(item) && item > 0 && item <= 4320);
       return Array.from(new Set(normalized)).slice(0, 12);
     }
     function parsePresetText(value) {
@@ -493,11 +498,12 @@ var require_settings = __commonJS({
 // src/settingsPanel.js
 var require_settingsPanel = __commonJS({
   "src/settingsPanel.js"(exports2, module2) {
-    var { parsePresetText } = require_settings();
+    var { DEFAULT_SETTINGS, parsePresetText } = require_settings();
     var { formatMinutes } = require_manualStatusTimer();
     function createSettingsPanel2({ settings, manualTimer }) {
       const root = document.createElement("div");
       root.className = "awaytimer-panel";
+      let message = "";
       const render = () => {
         root.innerHTML = `
       <style>
@@ -508,9 +514,12 @@ var require_settingsPanel = __commonJS({
         .awaytimer-buttons { display: flex; flex-wrap: wrap; gap: 8px; }
         .awaytimer-button { min-height: 38px; border: 0; border-radius: 6px; padding: 8px 14px; background: var(--brand-500, #5865f2); color: white; cursor: pointer; font-weight: 700; font-size: 14px; }
         .awaytimer-button:hover { filter: brightness(1.08); }
-        .awaytimer-button.secondary { justify-self: start; min-width: 132px; background: var(--brand-500, #5865f2); color: white; }
+        .awaytimer-actions { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }
+        .awaytimer-button.secondary { min-width: 132px; background: var(--brand-500, #5865f2); color: white; }
+        .awaytimer-button.neutral { background: var(--button-secondary-background, #4e5058); color: var(--button-secondary-text, #fff); }
         .awaytimer-field { display: grid; gap: 6px; }
         .awaytimer-input { width: min(520px, 100%); box-sizing: border-box; border: 1px solid var(--background-modifier-accent); border-radius: 6px; padding: 10px 12px; background: var(--input-background); color: var(--text-normal); font: inherit; font-size: 15px; }
+        .awaytimer-status { min-height: 18px; color: var(--text-positive, #23a55a); font-size: 13px; font-weight: 600; }
         .awaytimer-setting { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 18px; align-items: center; padding-top: 4px; }
         .awaytimer-switch { position: relative; width: 42px; height: 24px; border: 0; border-radius: 999px; background: var(--background-modifier-accent, #4e5058); cursor: pointer; }
         .awaytimer-switch::after { content: ""; position: absolute; top: 3px; left: 3px; width: 18px; height: 18px; border-radius: 50%; background: #fff; transition: transform 140ms ease; }
@@ -529,10 +538,14 @@ var require_settingsPanel = __commonJS({
       <div class="awaytimer-section">
         <div class="awaytimer-field">
           <label class="awaytimer-title" for="awaytimer-presets">Preset minutes</label>
-          <div class="awaytimer-note">Comma-separated minutes. Default: 20, 45, 120, 240, 1440</div>
+          <div class="awaytimer-note">Comma-separated minutes. Defaults match Discord: 15, 60, 480, 1440, 4320. Saved edits remain after updates.</div>
           <input id="awaytimer-presets" class="awaytimer-input" value="${escapeAttribute(settings.get("manualPresets").join(", "))}" />
         </div>
-        <button class="awaytimer-button secondary" data-save-presets>Save Presets</button>
+        <div class="awaytimer-actions">
+          <button class="awaytimer-button secondary" data-save-presets>Save Presets</button>
+          <button class="awaytimer-button neutral" data-reset-presets>Reset Presets</button>
+        </div>
+        <div class="awaytimer-status">${escapeAttribute(message)}</div>
       </div>
       <div class="awaytimer-section">
         ${renderSwitch("restoreManualTimersToOnline", "Manual Timers Return To Online", "When a custom Idle timer ends, set your status back to Online instead of restoring the previous status.", settings.get("restoreManualTimersToOnline"))}
@@ -546,7 +559,14 @@ var require_settingsPanel = __commonJS({
         if (minutesButton) manualTimer.setIdleForMinutes(minutesButton.dataset.minutes);
         if (event.target.closest("[data-save-presets]")) {
           const input = root.querySelector("#awaytimer-presets");
-          settings.set("manualPresets", parsePresetText(input.value));
+          const presets = parsePresetText(input.value);
+          settings.set("manualPresets", presets);
+          message = `Saved ${presets.length} preset${presets.length === 1 ? "" : "s"}.`;
+          render();
+        }
+        if (event.target.closest("[data-reset-presets]")) {
+          settings.set("manualPresets", DEFAULT_SETTINGS.manualPresets);
+          message = "Reset to Discord defaults.";
           render();
         }
         if (event.target.closest("[data-cancel-timer]")) manualTimer.cancel({ restore: true });

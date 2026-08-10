@@ -6,6 +6,8 @@ test("formatMinutes labels common custom durations", () => {
   assert.equal(formatMinutes(20), "20 minutes");
   assert.equal(formatMinutes(60), "1 hour");
   assert.equal(formatMinutes(150), "2h 30m");
+  assert.equal(formatMinutes(1440), "1 day");
+  assert.equal(formatMinutes(4320), "3 days");
 });
 
 test("nextTimeTodayOrTomorrow rejects invalid values", () => {

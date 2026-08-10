@@ -1,9 +1,10 @@
-const {parsePresetText} = require("./settings");
+const {DEFAULT_SETTINGS, parsePresetText} = require("./settings");
 const {formatMinutes} = require("./manualStatusTimer");
 
 function createSettingsPanel({settings, manualTimer}) {
   const root = document.createElement("div");
   root.className = "awaytimer-panel";
+  let message = "";
 
   const render = () => {
     root.innerHTML = `
@@ -15,9 +16,12 @@ function createSettingsPanel({settings, manualTimer}) {
         .awaytimer-buttons { display: flex; flex-wrap: wrap; gap: 8px; }
         .awaytimer-button { min-height: 38px; border: 0; border-radius: 6px; padding: 8px 14px; background: var(--brand-500, #5865f2); color: white; cursor: pointer; font-weight: 700; font-size: 14px; }
         .awaytimer-button:hover { filter: brightness(1.08); }
-        .awaytimer-button.secondary { justify-self: start; min-width: 132px; background: var(--brand-500, #5865f2); color: white; }
+        .awaytimer-actions { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }
+        .awaytimer-button.secondary { min-width: 132px; background: var(--brand-500, #5865f2); color: white; }
+        .awaytimer-button.neutral { background: var(--button-secondary-background, #4e5058); color: var(--button-secondary-text, #fff); }
         .awaytimer-field { display: grid; gap: 6px; }
         .awaytimer-input { width: min(520px, 100%); box-sizing: border-box; border: 1px solid var(--background-modifier-accent); border-radius: 6px; padding: 10px 12px; background: var(--input-background); color: var(--text-normal); font: inherit; font-size: 15px; }
+        .awaytimer-status { min-height: 18px; color: var(--text-positive, #23a55a); font-size: 13px; font-weight: 600; }
         .awaytimer-setting { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 18px; align-items: center; padding-top: 4px; }
         .awaytimer-switch { position: relative; width: 42px; height: 24px; border: 0; border-radius: 999px; background: var(--background-modifier-accent, #4e5058); cursor: pointer; }
         .awaytimer-switch::after { content: ""; position: absolute; top: 3px; left: 3px; width: 18px; height: 18px; border-radius: 50%; background: #fff; transition: transform 140ms ease; }
@@ -36,10 +40,14 @@ function createSettingsPanel({settings, manualTimer}) {
       <div class="awaytimer-section">
         <div class="awaytimer-field">
           <label class="awaytimer-title" for="awaytimer-presets">Preset minutes</label>
-          <div class="awaytimer-note">Comma-separated minutes. Default: 20, 45, 120, 240, 1440</div>
+          <div class="awaytimer-note">Comma-separated minutes. Defaults match Discord: 15, 60, 480, 1440, 4320. Saved edits remain after updates.</div>
           <input id="awaytimer-presets" class="awaytimer-input" value="${escapeAttribute(settings.get("manualPresets").join(", "))}" />
         </div>
-        <button class="awaytimer-button secondary" data-save-presets>Save Presets</button>
+        <div class="awaytimer-actions">
+          <button class="awaytimer-button secondary" data-save-presets>Save Presets</button>
+          <button class="awaytimer-button neutral" data-reset-presets>Reset Presets</button>
+        </div>
+        <div class="awaytimer-status">${escapeAttribute(message)}</div>
       </div>
       <div class="awaytimer-section">
         ${renderSwitch("restoreManualTimersToOnline", "Manual Timers Return To Online", "When a custom Idle timer ends, set your status back to Online instead of restoring the previous status.", settings.get("restoreManualTimersToOnline"))}
@@ -55,7 +63,15 @@ function createSettingsPanel({settings, manualTimer}) {
 
     if (event.target.closest("[data-save-presets]")) {
       const input = root.querySelector("#awaytimer-presets");
-      settings.set("manualPresets", parsePresetText(input.value));
+      const presets = parsePresetText(input.value);
+      settings.set("manualPresets", presets);
+      message = `Saved ${presets.length} preset${presets.length === 1 ? "" : "s"}.`;
+      render();
+    }
+
+    if (event.target.closest("[data-reset-presets]")) {
+      settings.set("manualPresets", DEFAULT_SETTINGS.manualPresets);
+      message = "Reset to Discord defaults.";
       render();
     }
 

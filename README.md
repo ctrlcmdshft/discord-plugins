@@ -4,7 +4,7 @@ Private BetterDiscord plugin workspace for plugins created by ctrlcmdshft.
 
 ## Plugins
 
-- `plugins/AwayTimer` - Custom Idle duration presets that replace Discord's default Idle duration menu choices with a tighter default list.
+- `plugins/AwayTimer` - Custom Idle duration presets that replace Discord's default Idle duration menu choices while preserving user-edited presets across updates.
 - `plugins/CommandCenter` - Raycast-style Discord command palette prototype.
 
 ## Releases

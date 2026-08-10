@@ -23,12 +23,12 @@ test("normalizeSettings clamps custom duration values", () => {
     customDurationMinutes: 9999
   });
 
-  assert.equal(settings.customDurationMinutes, 1440);
+  assert.equal(settings.customDurationMinutes, 4320);
 });
 
 test("normalizeSettings sanitizes preset list", () => {
   const settings = normalizeSettings({
-    manualPresets: [10, "20", -1, 10, 1500, 45.2]
+    manualPresets: [10, "20", -1, 10, 5000, 45.2]
   });
 
   assert.deepEqual(settings.manualPresets, [10, 20, 45]);
