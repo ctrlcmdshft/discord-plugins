@@ -1,4 +1,5 @@
-const PLUGIN_NAME = "AwayTimer";
+const PLUGIN_NAME = "StatusTimer";
+const LEGACY_PLUGIN_NAME = "AwayTimer";
 const ACTIVE_TIMER_KEY = "activeManualTimer";
 
 class ManualStatusTimer {
@@ -18,25 +19,34 @@ class ManualStatusTimer {
     this.clearTimer();
   }
 
-  setIdleForMinutes(minutes) {
+  setStatusForMinutes(status, minutes) {
     const durationMinutes = clampMinutes(minutes);
     const previousStatus = this.statusAdapter.currentStatus();
     const expiresAt = Date.now() + durationMinutes * 60 * 1000;
 
     if (!this.statusAdapter.canUpdateStatus()) {
-      this.notify("AwayTimer cannot change status in this Discord build.");
+      this.notify("StatusTimer cannot change status in this Discord build.");
       return false;
     }
 
-    if (!this.statusAdapter.updateStatus("idle")) return false;
+    if (!this.statusAdapter.updateStatus(status)) return false;
     BdApi.Data.save(PLUGIN_NAME, ACTIVE_TIMER_KEY, {
       expiresAt,
+      status,
       previousStatus: previousStatus === "unknown" ? "online" : previousStatus,
       restoreStatus: this.settings.get("restoreManualTimersToOnline") ? "online" : previousStatus
     });
     this.scheduleRestore(expiresAt);
-    this.notify(`Idle for ${formatMinutes(durationMinutes)}.`);
+    this.notify(`${humanStatus(status)} for ${formatMinutes(durationMinutes)}.`);
     return true;
+  }
+
+  setIdleForMinutes(minutes) {
+    return this.setStatusForMinutes("idle", minutes);
+  }
+
+  setDndForMinutes(minutes) {
+    return this.setStatusForMinutes("dnd", minutes);
   }
 
   setIdleUntil(timeValue) {
@@ -50,42 +60,55 @@ class ManualStatusTimer {
     return this.setIdleForMinutes(minutes);
   }
 
-  setIdleForever() {
+  setStatusForever(status) {
     if (!this.statusAdapter.canUpdateStatus()) {
-      this.notify("AwayTimer cannot change status in this Discord build.");
+      this.notify("StatusTimer cannot change status in this Discord build.");
       return false;
     }
 
     this.clearTimer();
     BdApi.Data.delete?.(PLUGIN_NAME, ACTIVE_TIMER_KEY);
-    if (!this.statusAdapter.updateStatus("idle")) return false;
-    this.notify("Idle forever.");
+    BdApi.Data.delete?.(LEGACY_PLUGIN_NAME, ACTIVE_TIMER_KEY);
+    if (!this.statusAdapter.updateStatus(status)) return false;
+    this.notify(`${humanStatus(status)} forever.`);
     return true;
+  }
+
+  setIdleForever() {
+    return this.setStatusForever("idle");
+  }
+
+  setDndForever() {
+    return this.setStatusForever("dnd");
   }
 
   cancel({restore = false} = {}) {
     const active = BdApi.Data.load(PLUGIN_NAME, ACTIVE_TIMER_KEY);
     this.clearTimer();
     BdApi.Data.delete?.(PLUGIN_NAME, ACTIVE_TIMER_KEY);
-    if (restore && active?.previousStatus && this.statusAdapter.currentStatus() === "idle") {
+    BdApi.Data.delete?.(LEGACY_PLUGIN_NAME, ACTIVE_TIMER_KEY);
+    if (restore && active?.previousStatus && this.statusAdapter.currentStatus() === active.status) {
       this.statusAdapter.updateStatus(active.previousStatus);
     }
-    this.notify("AwayTimer manual timer cancelled.");
+    this.notify("StatusTimer manual timer cancelled.");
   }
 
-  getActiveTimer() {
-    const active = BdApi.Data.load(PLUGIN_NAME, ACTIVE_TIMER_KEY);
+  getActiveTimer(status = null) {
+    const active = BdApi.Data.load(PLUGIN_NAME, ACTIVE_TIMER_KEY) || BdApi.Data.load(LEGACY_PLUGIN_NAME, ACTIVE_TIMER_KEY);
     if (!active?.expiresAt) return null;
     if (active.expiresAt <= Date.now()) return null;
+    const activeStatus = active.status || "idle";
+    if (status && activeStatus !== status) return null;
 
     return {
       ...active,
+      status: activeStatus,
       remainingMs: active.expiresAt - Date.now()
     };
   }
 
   resumeActiveTimer() {
-    const active = BdApi.Data.load(PLUGIN_NAME, ACTIVE_TIMER_KEY);
+    const active = BdApi.Data.load(PLUGIN_NAME, ACTIVE_TIMER_KEY) || BdApi.Data.load(LEGACY_PLUGIN_NAME, ACTIVE_TIMER_KEY);
     if (!active?.expiresAt) return;
 
     if (active.expiresAt <= Date.now()) {
@@ -103,11 +126,13 @@ class ManualStatusTimer {
   restoreFromTimer(timerData = BdApi.Data.load(PLUGIN_NAME, ACTIVE_TIMER_KEY)) {
     this.clearTimer();
     BdApi.Data.delete?.(PLUGIN_NAME, ACTIVE_TIMER_KEY);
+    BdApi.Data.delete?.(LEGACY_PLUGIN_NAME, ACTIVE_TIMER_KEY);
     const restoreStatus = timerData?.restoreStatus || timerData?.previousStatus;
-    if (!restoreStatus || this.statusAdapter.currentStatus() !== "idle") return;
+    const timerStatus = timerData?.status || "idle";
+    if (!restoreStatus || this.statusAdapter.currentStatus() !== timerStatus) return;
 
     if (this.statusAdapter.updateStatus(restoreStatus)) {
-      this.notify(`AwayTimer restored ${humanStatus(restoreStatus)}.`);
+      this.notify(`StatusTimer restored ${humanStatus(restoreStatus)}.`);
     }
   }
 

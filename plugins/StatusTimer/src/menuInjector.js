@@ -6,6 +6,8 @@ class MenuInjector {
     this.manualTimer = manualTimer;
     this.observer = null;
     this.pending = false;
+    this.lastStatusKind = "idle";
+    this.handlePointerOver = this.handlePointerOver.bind(this);
   }
 
   start() {
@@ -14,6 +16,7 @@ class MenuInjector {
       childList: true,
       subtree: true
     });
+    document.addEventListener("pointerover", this.handlePointerOver, true);
     this.scheduleInject();
   }
 
@@ -21,6 +24,7 @@ class MenuInjector {
     this.observer?.disconnect();
     this.observer = null;
     this.pending = false;
+    document.removeEventListener("pointerover", this.handlePointerOver, true);
     for (const node of document.querySelectorAll(".awaytimer-native-menu-group")) {
       node.remove();
     }
@@ -50,13 +54,22 @@ class MenuInjector {
     });
   }
 
+  handlePointerOver(event) {
+    const item = event.target?.closest?.('[role="menuitem"], button');
+    if (!item) return;
+    const text = normalizeText(item.textContent);
+    if (text.startsWith("Idle")) this.lastStatusKind = "idle";
+    if (text.startsWith("Do Not Disturb")) this.lastStatusKind = "dnd";
+  }
+
   injectIntoDurationMenus() {
     for (const menu of findCandidateMenus()) {
       if (menu.querySelector(".awaytimer-native-menu-group")) continue;
       const nativeItems = getNativeIdleDurationItems(menu);
       if (!nativeItems.length) continue;
       const firstNativeItem = nativeItems[0];
-      firstNativeItem.before(this.createMenuGroup(firstNativeItem));
+      const statusKind = inferStatusKind(menu, this.lastStatusKind);
+      firstNativeItem.before(this.createMenuGroup(firstNativeItem, statusKind));
       for (const item of nativeItems) {
         item.classList.add("awaytimer-hidden-native-menu-item");
         item.hidden = true;
@@ -64,12 +77,12 @@ class MenuInjector {
     }
   }
 
-  createMenuGroup(templateItem) {
+  createMenuGroup(templateItem, statusKind) {
     const group = document.createElement("div");
     group.className = "awaytimer-native-menu-group";
     group.setAttribute("role", "group");
 
-    const activeTimer = this.manualTimer.getActiveTimer();
+    const activeTimer = this.manualTimer.getActiveTimer(statusKind);
     if (activeTimer) {
       const activeItem = createClonedMenuItem(templateItem, "awaytimer-active-timer");
       activeItem.setAttribute("aria-disabled", "true");
@@ -88,14 +101,14 @@ class MenuInjector {
       group.append(cancelItem);
     }
 
-    for (const minutes of this.settings.get("manualPresets")) {
+    for (const minutes of this.settings.get(`${statusKind}Presets`)) {
       const item = createClonedMenuItem(templateItem, "awaytimer-minutes");
       item.setAttribute("data-awaytimer-minutes", String(minutes));
       replaceVisibleText(item, `For ${formatMinutes(minutes)}`);
       item.addEventListener("click", (event) => {
         event.preventDefault();
         event.stopPropagation();
-        this.manualTimer.setIdleForMinutes(minutes);
+        this.manualTimer.setStatusForMinutes(statusKind, minutes);
         closeDiscordMenu();
       });
       group.append(item);
@@ -107,13 +120,24 @@ class MenuInjector {
     foreverItem.addEventListener("click", (event) => {
       event.preventDefault();
       event.stopPropagation();
-      this.manualTimer.setIdleForever();
+      this.manualTimer.setStatusForever(statusKind);
       closeDiscordMenu();
     });
     group.append(foreverItem);
 
     return group;
   }
+}
+
+function inferStatusKind(menu, fallback) {
+  const rootMenuText = Array.from(document.querySelectorAll('[role="menu"]'))
+    .filter((node) => node !== menu)
+    .map((node) => normalizeText(node.textContent))
+    .join(" ");
+
+  if (rootMenuText.includes("Do Not Disturb") && fallback === "dnd") return "dnd";
+  if (rootMenuText.includes("Idle") && fallback === "idle") return "idle";
+  return fallback === "dnd" ? "dnd" : "idle";
 }
 
 function createClonedMenuItem(templateItem, kind) {

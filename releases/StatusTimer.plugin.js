@@ -1,8 +1,8 @@
 /**
- * @name AwayTimer
+ * @name StatusTimer
  * @author ctrlcmdshft
- * @description Choose exactly when Discord should show you as away/idle.
- * @version 0.6.0
+ * @description Custom duration presets for Discord status timers.
+ * @version 0.7.0
  */
 var __getOwnPropNames = Object.getOwnPropertyNames;
 var __commonJS = (cb, mod) => function __require() {
@@ -16,7 +16,8 @@ var __commonJS = (cb, mod) => function __require() {
 // src/manualStatusTimer.js
 var require_manualStatusTimer = __commonJS({
   "src/manualStatusTimer.js"(exports2, module2) {
-    var PLUGIN_NAME = "AwayTimer";
+    var PLUGIN_NAME = "StatusTimer";
+    var LEGACY_PLUGIN_NAME = "AwayTimer";
     var ACTIVE_TIMER_KEY = "activeManualTimer";
     var ManualStatusTimer2 = class {
       constructor({ settings, statusAdapter, notify, logger }) {
@@ -32,23 +33,30 @@ var require_manualStatusTimer = __commonJS({
       stop() {
         this.clearTimer();
       }
-      setIdleForMinutes(minutes) {
+      setStatusForMinutes(status, minutes) {
         const durationMinutes = clampMinutes(minutes);
         const previousStatus = this.statusAdapter.currentStatus();
         const expiresAt = Date.now() + durationMinutes * 60 * 1e3;
         if (!this.statusAdapter.canUpdateStatus()) {
-          this.notify("AwayTimer cannot change status in this Discord build.");
+          this.notify("StatusTimer cannot change status in this Discord build.");
           return false;
         }
-        if (!this.statusAdapter.updateStatus("idle")) return false;
+        if (!this.statusAdapter.updateStatus(status)) return false;
         BdApi.Data.save(PLUGIN_NAME, ACTIVE_TIMER_KEY, {
           expiresAt,
+          status,
           previousStatus: previousStatus === "unknown" ? "online" : previousStatus,
           restoreStatus: this.settings.get("restoreManualTimersToOnline") ? "online" : previousStatus
         });
         this.scheduleRestore(expiresAt);
-        this.notify(`Idle for ${formatMinutes(durationMinutes)}.`);
+        this.notify(`${humanStatus(status)} for ${formatMinutes(durationMinutes)}.`);
         return true;
+      }
+      setIdleForMinutes(minutes) {
+        return this.setStatusForMinutes("idle", minutes);
+      }
+      setDndForMinutes(minutes) {
+        return this.setStatusForMinutes("dnd", minutes);
       }
       setIdleUntil(timeValue) {
         const expiresAt = nextTimeTodayOrTomorrow(timeValue);
@@ -59,37 +67,48 @@ var require_manualStatusTimer = __commonJS({
         const minutes = Math.max(1, Math.round((expiresAt - Date.now()) / 6e4));
         return this.setIdleForMinutes(minutes);
       }
-      setIdleForever() {
+      setStatusForever(status) {
         if (!this.statusAdapter.canUpdateStatus()) {
-          this.notify("AwayTimer cannot change status in this Discord build.");
+          this.notify("StatusTimer cannot change status in this Discord build.");
           return false;
         }
         this.clearTimer();
         BdApi.Data.delete?.(PLUGIN_NAME, ACTIVE_TIMER_KEY);
-        if (!this.statusAdapter.updateStatus("idle")) return false;
-        this.notify("Idle forever.");
+        BdApi.Data.delete?.(LEGACY_PLUGIN_NAME, ACTIVE_TIMER_KEY);
+        if (!this.statusAdapter.updateStatus(status)) return false;
+        this.notify(`${humanStatus(status)} forever.`);
         return true;
+      }
+      setIdleForever() {
+        return this.setStatusForever("idle");
+      }
+      setDndForever() {
+        return this.setStatusForever("dnd");
       }
       cancel({ restore = false } = {}) {
         const active = BdApi.Data.load(PLUGIN_NAME, ACTIVE_TIMER_KEY);
         this.clearTimer();
         BdApi.Data.delete?.(PLUGIN_NAME, ACTIVE_TIMER_KEY);
-        if (restore && active?.previousStatus && this.statusAdapter.currentStatus() === "idle") {
+        BdApi.Data.delete?.(LEGACY_PLUGIN_NAME, ACTIVE_TIMER_KEY);
+        if (restore && active?.previousStatus && this.statusAdapter.currentStatus() === active.status) {
           this.statusAdapter.updateStatus(active.previousStatus);
         }
-        this.notify("AwayTimer manual timer cancelled.");
+        this.notify("StatusTimer manual timer cancelled.");
       }
-      getActiveTimer() {
-        const active = BdApi.Data.load(PLUGIN_NAME, ACTIVE_TIMER_KEY);
+      getActiveTimer(status = null) {
+        const active = BdApi.Data.load(PLUGIN_NAME, ACTIVE_TIMER_KEY) || BdApi.Data.load(LEGACY_PLUGIN_NAME, ACTIVE_TIMER_KEY);
         if (!active?.expiresAt) return null;
         if (active.expiresAt <= Date.now()) return null;
+        const activeStatus = active.status || "idle";
+        if (status && activeStatus !== status) return null;
         return {
           ...active,
+          status: activeStatus,
           remainingMs: active.expiresAt - Date.now()
         };
       }
       resumeActiveTimer() {
-        const active = BdApi.Data.load(PLUGIN_NAME, ACTIVE_TIMER_KEY);
+        const active = BdApi.Data.load(PLUGIN_NAME, ACTIVE_TIMER_KEY) || BdApi.Data.load(LEGACY_PLUGIN_NAME, ACTIVE_TIMER_KEY);
         if (!active?.expiresAt) return;
         if (active.expiresAt <= Date.now()) {
           this.restoreFromTimer(active);
@@ -104,10 +123,12 @@ var require_manualStatusTimer = __commonJS({
       restoreFromTimer(timerData = BdApi.Data.load(PLUGIN_NAME, ACTIVE_TIMER_KEY)) {
         this.clearTimer();
         BdApi.Data.delete?.(PLUGIN_NAME, ACTIVE_TIMER_KEY);
+        BdApi.Data.delete?.(LEGACY_PLUGIN_NAME, ACTIVE_TIMER_KEY);
         const restoreStatus = timerData?.restoreStatus || timerData?.previousStatus;
-        if (!restoreStatus || this.statusAdapter.currentStatus() !== "idle") return;
+        const timerStatus = timerData?.status || "idle";
+        if (!restoreStatus || this.statusAdapter.currentStatus() !== timerStatus) return;
         if (this.statusAdapter.updateStatus(restoreStatus)) {
-          this.notify(`AwayTimer restored ${humanStatus(restoreStatus)}.`);
+          this.notify(`StatusTimer restored ${humanStatus(restoreStatus)}.`);
         }
       }
       clearTimer() {
@@ -172,6 +193,8 @@ var require_menuInjector = __commonJS({
         this.manualTimer = manualTimer;
         this.observer = null;
         this.pending = false;
+        this.lastStatusKind = "idle";
+        this.handlePointerOver = this.handlePointerOver.bind(this);
       }
       start() {
         this.observer = new MutationObserver(() => this.scheduleInject());
@@ -179,12 +202,14 @@ var require_menuInjector = __commonJS({
           childList: true,
           subtree: true
         });
+        document.addEventListener("pointerover", this.handlePointerOver, true);
         this.scheduleInject();
       }
       stop() {
         this.observer?.disconnect();
         this.observer = null;
         this.pending = false;
+        document.removeEventListener("pointerover", this.handlePointerOver, true);
         for (const node of document.querySelectorAll(".awaytimer-native-menu-group")) {
           node.remove();
         }
@@ -211,24 +236,32 @@ var require_menuInjector = __commonJS({
           this.injectIntoDurationMenus();
         });
       }
+      handlePointerOver(event) {
+        const item = event.target?.closest?.('[role="menuitem"], button');
+        if (!item) return;
+        const text = normalizeText(item.textContent);
+        if (text.startsWith("Idle")) this.lastStatusKind = "idle";
+        if (text.startsWith("Do Not Disturb")) this.lastStatusKind = "dnd";
+      }
       injectIntoDurationMenus() {
         for (const menu of findCandidateMenus()) {
           if (menu.querySelector(".awaytimer-native-menu-group")) continue;
           const nativeItems = getNativeIdleDurationItems(menu);
           if (!nativeItems.length) continue;
           const firstNativeItem = nativeItems[0];
-          firstNativeItem.before(this.createMenuGroup(firstNativeItem));
+          const statusKind = inferStatusKind(menu, this.lastStatusKind);
+          firstNativeItem.before(this.createMenuGroup(firstNativeItem, statusKind));
           for (const item of nativeItems) {
             item.classList.add("awaytimer-hidden-native-menu-item");
             item.hidden = true;
           }
         }
       }
-      createMenuGroup(templateItem) {
+      createMenuGroup(templateItem, statusKind) {
         const group = document.createElement("div");
         group.className = "awaytimer-native-menu-group";
         group.setAttribute("role", "group");
-        const activeTimer = this.manualTimer.getActiveTimer();
+        const activeTimer = this.manualTimer.getActiveTimer(statusKind);
         if (activeTimer) {
           const activeItem = createClonedMenuItem(templateItem, "awaytimer-active-timer");
           activeItem.setAttribute("aria-disabled", "true");
@@ -245,14 +278,14 @@ var require_menuInjector = __commonJS({
           });
           group.append(cancelItem);
         }
-        for (const minutes of this.settings.get("manualPresets")) {
+        for (const minutes of this.settings.get(`${statusKind}Presets`)) {
           const item = createClonedMenuItem(templateItem, "awaytimer-minutes");
           item.setAttribute("data-awaytimer-minutes", String(minutes));
           replaceVisibleText(item, `For ${formatMinutes(minutes)}`);
           item.addEventListener("click", (event) => {
             event.preventDefault();
             event.stopPropagation();
-            this.manualTimer.setIdleForMinutes(minutes);
+            this.manualTimer.setStatusForMinutes(statusKind, minutes);
             closeDiscordMenu();
           });
           group.append(item);
@@ -263,13 +296,19 @@ var require_menuInjector = __commonJS({
         foreverItem.addEventListener("click", (event) => {
           event.preventDefault();
           event.stopPropagation();
-          this.manualTimer.setIdleForever();
+          this.manualTimer.setStatusForever(statusKind);
           closeDiscordMenu();
         });
         group.append(foreverItem);
         return group;
       }
     };
+    function inferStatusKind(menu, fallback) {
+      const rootMenuText = Array.from(document.querySelectorAll('[role="menu"]')).filter((node) => node !== menu).map((node) => normalizeText(node.textContent)).join(" ");
+      if (rootMenuText.includes("Do Not Disturb") && fallback === "dnd") return "dnd";
+      if (rootMenuText.includes("Idle") && fallback === "idle") return "idle";
+      return fallback === "dnd" ? "dnd" : "idle";
+    }
     function createClonedMenuItem(templateItem, kind) {
       const item = templateItem.cloneNode(true);
       item.classList.add("awaytimer-native-menu-item", kind);
@@ -323,146 +362,30 @@ var require_menuInjector = __commonJS({
   }
 });
 
-// src/quickLauncher.js
-var require_quickLauncher = __commonJS({
-  "src/quickLauncher.js"(exports2, module2) {
-    var { formatMinutes } = require_manualStatusTimer();
-    var QuickLauncher2 = class {
-      constructor({ settings, manualTimer }) {
-        this.settings = settings;
-        this.manualTimer = manualTimer;
-        this.root = null;
-        this.isOpen = false;
-        this.handleDocumentClick = this.handleDocumentClick.bind(this);
-        this.handleKeyDown = this.handleKeyDown.bind(this);
-      }
-      start() {
-        this.root = document.createElement("div");
-        this.root.className = "awaytimer-launcher";
-        this.root.innerHTML = `
-      <button class="awaytimer-launcher-button" title="AwayTimer" aria-haspopup="true" aria-expanded="false">
-        Away
-      </button>
-      <div class="awaytimer-popover" hidden></div>
-    `;
-        this.root.querySelector(".awaytimer-launcher-button").addEventListener("click", (event) => {
-          event.stopPropagation();
-          this.toggle();
-        });
-        this.root.addEventListener("click", (event) => this.handlePopoverClick(event));
-        document.addEventListener("click", this.handleDocumentClick);
-        document.addEventListener("keydown", this.handleKeyDown);
-        document.body.append(this.root);
-      }
-      stop() {
-        document.removeEventListener("click", this.handleDocumentClick);
-        document.removeEventListener("keydown", this.handleKeyDown);
-        this.root?.remove();
-        this.root = null;
-        this.isOpen = false;
-      }
-      toggle() {
-        if (this.isOpen) this.close();
-        else this.open();
-      }
-      open() {
-        this.isOpen = true;
-        this.renderPopover();
-        this.root.querySelector(".awaytimer-launcher-button").setAttribute("aria-expanded", "true");
-        this.root.querySelector(".awaytimer-popover").hidden = false;
-      }
-      close() {
-        if (!this.root) return;
-        this.isOpen = false;
-        this.root.querySelector(".awaytimer-launcher-button").setAttribute("aria-expanded", "false");
-        this.root.querySelector(".awaytimer-popover").hidden = true;
-      }
-      renderPopover() {
-        const popover = this.root.querySelector(".awaytimer-popover");
-        popover.innerHTML = `
-      <div class="awaytimer-popover-title">Set Idle</div>
-      <div class="awaytimer-popover-grid">
-        ${this.settings.get("manualPresets").map((minutes) => `
-          <button class="awaytimer-popover-button" data-minutes="${minutes}">${formatMinutes(minutes)}</button>
-        `).join("")}
-        <button class="awaytimer-popover-button" data-forever>Forever</button>
-      </div>
-      <div class="awaytimer-popover-row">
-        <input class="awaytimer-popover-input" type="number" min="1" max="1440" value="${this.settings.get("customDurationMinutes")}" data-custom-minutes />
-        <button class="awaytimer-popover-button primary" data-custom-start>Start</button>
-      </div>
-      <div class="awaytimer-popover-row">
-        <input class="awaytimer-popover-input" type="time" data-until-time />
-        <button class="awaytimer-popover-button primary" data-until-start>Until</button>
-      </div>
-      <button class="awaytimer-popover-button secondary full" data-cancel-timer>Cancel Timer</button>
-    `;
-      }
-      handlePopoverClick(event) {
-        const minutesButton = event.target.closest("[data-minutes]");
-        if (minutesButton) {
-          this.manualTimer.setIdleForMinutes(minutesButton.dataset.minutes);
-          this.close();
-          return;
-        }
-        if (event.target.closest("[data-forever]")) {
-          this.manualTimer.setIdleForever();
-          this.close();
-          return;
-        }
-        if (event.target.closest("[data-custom-start]")) {
-          const input = this.root.querySelector("[data-custom-minutes]");
-          this.settings.set("customDurationMinutes", input.value);
-          this.manualTimer.setIdleForMinutes(input.value);
-          this.close();
-          return;
-        }
-        if (event.target.closest("[data-until-start]")) {
-          const input = this.root.querySelector("[data-until-time]");
-          if (this.manualTimer.setIdleUntil(input.value)) this.close();
-          return;
-        }
-        if (event.target.closest("[data-cancel-timer]")) {
-          this.manualTimer.cancel({ restore: true });
-          this.close();
-        }
-      }
-      handleDocumentClick(event) {
-        if (!this.root || this.root.contains(event.target)) return;
-        this.close();
-      }
-      handleKeyDown(event) {
-        if (event.key === "Escape") this.close();
-      }
-    };
-    module2.exports = {
-      QuickLauncher: QuickLauncher2
-    };
-  }
-});
-
 // src/settings.js
 var require_settings = __commonJS({
   "src/settings.js"(exports2, module2) {
-    var PLUGIN_NAME = "AwayTimer";
+    var PLUGIN_NAME = "StatusTimer";
+    var LEGACY_PLUGIN_NAME = "AwayTimer";
     var DEFAULT_SETTINGS = Object.freeze({
-      manualPresets: [15, 60, 480, 1440, 4320],
+      idlePresets: [15, 60, 480, 1440, 4320],
+      dndPresets: [15, 60, 480, 1440, 4320],
       customDurationMinutes: 30,
       restoreManualTimersToOnline: true,
-      showQuickButton: false,
       showToasts: true
     });
     function normalizeSettings(value = {}) {
+      const legacyPresets = value.manualPresets;
       return {
-        manualPresets: normalizePresets(value.manualPresets),
+        idlePresets: normalizePresets(value.idlePresets || legacyPresets),
+        dndPresets: normalizePresets(value.dndPresets || legacyPresets),
         customDurationMinutes: clampNumber(value.customDurationMinutes, DEFAULT_SETTINGS.customDurationMinutes, 1, 4320),
         restoreManualTimersToOnline: value.restoreManualTimersToOnline !== void 0 ? Boolean(value.restoreManualTimersToOnline) : DEFAULT_SETTINGS.restoreManualTimersToOnline,
-        showQuickButton: value.showQuickButton !== void 0 ? Boolean(value.showQuickButton) : DEFAULT_SETTINGS.showQuickButton,
         showToasts: value.showToasts !== void 0 ? Boolean(value.showToasts) : DEFAULT_SETTINGS.showToasts
       };
     }
     function normalizePresets(value) {
-      const presets = Array.isArray(value) ? value : DEFAULT_SETTINGS.manualPresets;
+      const presets = Array.isArray(value) ? value : DEFAULT_SETTINGS.idlePresets;
       const normalized = presets.map((item) => Math.round(Number(item))).filter((item) => Number.isFinite(item) && item > 0 && item <= 4320);
       return Array.from(new Set(normalized)).slice(0, 12);
     }
@@ -495,7 +418,10 @@ var require_settings = __commonJS({
     var SettingsStore2 = class {
       constructor({ onChange } = {}) {
         this.onChange = onChange;
-        this.values = normalizeSettings(BdApi.Data.load(PLUGIN_NAME, "settings"));
+        const stored = BdApi.Data.load(PLUGIN_NAME, "settings");
+        const legacyStored = stored ? null : BdApi.Data.load(LEGACY_PLUGIN_NAME, "settings");
+        this.values = normalizeSettings(stored || legacyStored);
+        if (!stored && legacyStored) BdApi.Data.save(PLUGIN_NAME, "settings", this.values);
       }
       get all() {
         return { ...this.values };
@@ -520,16 +446,9 @@ var require_settings = __commonJS({
             },
             {
               type: "switch",
-              id: "showQuickButton",
-              name: "Show Floating Quick Button",
-              note: "Shows the old Away button near the lower-left user panel as a fallback.",
-              value: this.values.showQuickButton
-            },
-            {
-              type: "switch",
               id: "showToasts",
               name: "Show Toasts",
-              note: "Shows a small notice when AwayTimer changes your status.",
+              note: "Shows a small notice when StatusTimer changes your status.",
               value: this.values.showToasts
             }
           ],
@@ -555,7 +474,7 @@ var require_settingsPanel = __commonJS({
     function createSettingsPanel2({ settings, manualTimer }) {
       const root = document.createElement("div");
       root.className = "awaytimer-panel";
-      let message = "";
+      let message2 = "";
       const render = () => {
         const activeTimer = manualTimer.getActiveTimer();
         root.innerHTML = `
@@ -581,53 +500,39 @@ var require_settingsPanel = __commonJS({
         .awaytimer-switch.is-on::after { transform: translateX(18px); }
       </style>
       <div class="awaytimer-section">
-        <div class="awaytimer-title">Custom Idle Timers</div>
-        <div class="awaytimer-note">Set Idle for your own durations instead of Discord's fixed 15m, 1h, 8h, 24h, 3d, and Forever choices.</div>
+        <div class="awaytimer-title">Status Timers</div>
+        <div class="awaytimer-note">Replace Discord's timed status choices with editable presets for Idle and Do Not Disturb.</div>
         ${activeTimer ? renderActiveTimer(activeTimer) : ""}
-        <div class="awaytimer-buttons">
-          ${settings.get("manualPresets").map((minutes) => `
-            <button class="awaytimer-button" data-minutes="${minutes}">${formatMinutes(minutes)}</button>
-          `).join("")}
-        </div>
       </div>
+      ${renderPresetSection("idle", "Idle Presets", settings.get("idlePresets"))}
+      ${renderPresetSection("dnd", "Do Not Disturb Presets", settings.get("dndPresets"))}
       <div class="awaytimer-section">
-        <div class="awaytimer-field">
-          <label class="awaytimer-title" for="awaytimer-presets">Preset minutes</label>
-          <div class="awaytimer-note">Comma-separated minutes. Defaults match Discord: 15, 60, 480, 1440, 4320. Saved edits remain after updates.</div>
-          <input id="awaytimer-presets" class="awaytimer-input" value="${escapeAttribute(settings.get("manualPresets").join(", "))}" />
-        </div>
-        <div class="awaytimer-actions">
-          <button class="awaytimer-button secondary" data-save-presets>Save Presets</button>
-          <button class="awaytimer-button neutral" data-reset-presets>Reset Presets</button>
-        </div>
-        <div class="awaytimer-status">${escapeAttribute(message)}</div>
-      </div>
-      <div class="awaytimer-section">
-        ${renderSwitch("restoreManualTimersToOnline", "Manual Timers Return To Online", "When a custom Idle timer ends, set your status back to Online instead of restoring the previous status.", settings.get("restoreManualTimersToOnline"))}
-        ${renderSwitch("showQuickButton", "Show Floating Quick Button", "Shows the old Away button near the lower-left user panel as a fallback.", settings.get("showQuickButton"))}
-        ${renderSwitch("showToasts", "Show Toasts", "Shows a small notice when AwayTimer changes your status.", settings.get("showToasts"))}
+        ${renderSwitch("restoreManualTimersToOnline", "Timers Return To Online", "When a custom status timer ends, set your status back to Online instead of restoring the previous status.", settings.get("restoreManualTimersToOnline"))}
+        ${renderSwitch("showToasts", "Show Toasts", "Shows a small notice when StatusTimer changes your status.", settings.get("showToasts"))}
       </div>
     `;
       };
       root.addEventListener("click", (event) => {
         const minutesButton = event.target.closest("[data-minutes]");
-        if (minutesButton) manualTimer.setIdleForMinutes(minutesButton.dataset.minutes);
+        if (minutesButton) manualTimer.setStatusForMinutes(minutesButton.dataset.statusKind, minutesButton.dataset.minutes);
         if (event.target.closest("[data-save-presets]")) {
-          const input = root.querySelector("#awaytimer-presets");
+          const statusKind = event.target.closest("[data-save-presets]").dataset.statusKind;
+          const input = root.querySelector(`[data-preset-input="${statusKind}"]`);
           const { presets, invalidCount } = parsePresetTextDetailed(input.value);
-          settings.set("manualPresets", presets);
-          message = `Saved ${presets.length} preset${presets.length === 1 ? "" : "s"}.`;
-          if (invalidCount) message += ` Ignored ${invalidCount} invalid value${invalidCount === 1 ? "" : "s"}.`;
+          settings.set(`${statusKind}Presets`, presets);
+          message2 = `Saved ${labelStatusKind(statusKind)} presets.`;
+          if (invalidCount) message2 += ` Ignored ${invalidCount} invalid value${invalidCount === 1 ? "" : "s"}.`;
           render();
         }
         if (event.target.closest("[data-reset-presets]")) {
-          settings.set("manualPresets", DEFAULT_SETTINGS.manualPresets);
-          message = "Reset to Discord defaults.";
+          const statusKind = event.target.closest("[data-reset-presets]").dataset.statusKind;
+          settings.set(`${statusKind}Presets`, DEFAULT_SETTINGS[`${statusKind}Presets`]);
+          message2 = `Reset ${labelStatusKind(statusKind)} presets to Discord defaults.`;
           render();
         }
         if (event.target.closest("[data-cancel-timer]")) {
           manualTimer.cancel({ restore: true });
-          message = "Cancelled active timer.";
+          message2 = "Cancelled active timer.";
           render();
         }
         const switchButton = event.target.closest("[data-toggle-setting]");
@@ -646,11 +551,35 @@ var require_settingsPanel = __commonJS({
     <div class="awaytimer-active">
       <div>
         <div class="awaytimer-title">Active Timer</div>
-        <div class="awaytimer-note">Idle until ${escapeAttribute(formatClockTime(activeTimer.expiresAt))}. About ${escapeAttribute(formatMinutes(remainingMinutes))} remaining.</div>
+        <div class="awaytimer-note">${escapeAttribute(labelStatusKind(activeTimer.status))} until ${escapeAttribute(formatClockTime(activeTimer.expiresAt))}. About ${escapeAttribute(formatMinutes(remainingMinutes))} remaining.</div>
       </div>
       <button class="awaytimer-button neutral" data-cancel-timer>Cancel Timer</button>
     </div>
   `;
+    }
+    function renderPresetSection(statusKind, title, presets) {
+      return `
+    <div class="awaytimer-section">
+      <div class="awaytimer-field">
+        <label class="awaytimer-title">${escapeAttribute(title)}</label>
+        <div class="awaytimer-note">Comma-separated minutes. Defaults match Discord: 15, 60, 480, 1440, 4320. Saved edits remain after updates.</div>
+        <input class="awaytimer-input" data-preset-input="${escapeAttribute(statusKind)}" value="${escapeAttribute(presets.join(", "))}" />
+      </div>
+      <div class="awaytimer-buttons">
+        ${presets.map((minutes) => `
+          <button class="awaytimer-button" data-status-kind="${escapeAttribute(statusKind)}" data-minutes="${minutes}">${formatMinutes(minutes)}</button>
+        `).join("")}
+      </div>
+      <div class="awaytimer-actions">
+        <button class="awaytimer-button secondary" data-status-kind="${escapeAttribute(statusKind)}" data-save-presets>Save Presets</button>
+        <button class="awaytimer-button neutral" data-status-kind="${escapeAttribute(statusKind)}" data-reset-presets>Reset Presets</button>
+      </div>
+      <div class="awaytimer-status">${escapeAttribute(message)}</div>
+    </div>
+  `;
+    }
+    function labelStatusKind(statusKind) {
+      return statusKind === "dnd" ? "Do Not Disturb" : "Idle";
     }
     function renderSwitch(id, title, note, enabled) {
       return `
@@ -743,106 +672,6 @@ var require_statusAdapter = __commonJS({
 var require_styles = __commonJS({
   "src/styles.js"(exports2, module2) {
     module2.exports = `
-.awaytimer-launcher {
-  position: fixed;
-  left: 18px;
-  bottom: 78px;
-  z-index: 10000;
-  font-family: var(--font-primary, "gg sans", "Helvetica Neue", Helvetica, Arial, sans-serif);
-}
-
-.awaytimer-launcher-button,
-.awaytimer-popover-button {
-  border: 0;
-  border-radius: 6px;
-  background: var(--brand-500, #5865f2);
-  color: #fff;
-  cursor: pointer;
-  font: inherit;
-  font-size: 13px;
-  font-weight: 700;
-}
-
-.awaytimer-launcher-button {
-  min-width: 58px;
-  height: 32px;
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.28);
-}
-
-.awaytimer-launcher-button:hover,
-.awaytimer-popover-button:hover {
-  filter: brightness(1.08);
-}
-
-.awaytimer-popover {
-  position: absolute;
-  left: 0;
-  bottom: 42px;
-  width: 260px;
-  display: grid;
-  gap: 10px;
-  padding: 12px;
-  color: var(--text-normal, #dbdee1);
-  background: var(--background-floating, #111214);
-  border: 1px solid var(--border-subtle, rgba(255, 255, 255, 0.12));
-  border-radius: 8px;
-  box-shadow: 0 18px 48px rgba(0, 0, 0, 0.45);
-}
-
-.awaytimer-popover[hidden] {
-  display: none;
-}
-
-.awaytimer-popover-title {
-  font-size: 14px;
-  font-weight: 800;
-}
-
-.awaytimer-popover-grid {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 8px;
-}
-
-.awaytimer-popover-row {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) 76px;
-  gap: 8px;
-}
-
-.awaytimer-popover-button {
-  min-height: 34px;
-  padding: 7px 10px;
-  background: var(--background-modifier-selected, rgba(255, 255, 255, 0.1));
-  color: var(--text-normal, #f2f3f5);
-}
-
-.awaytimer-popover-button.primary {
-  background: var(--brand-500, #5865f2);
-  color: #fff;
-}
-
-.awaytimer-popover-button.secondary {
-  background: var(--button-secondary-background, #4e5058);
-}
-
-.awaytimer-popover-button.full {
-  width: 100%;
-}
-
-.awaytimer-popover-input {
-  min-width: 0;
-  height: 34px;
-  box-sizing: border-box;
-  border: 1px solid var(--background-modifier-accent, rgba(255, 255, 255, 0.12));
-  border-radius: 6px;
-  padding: 0 9px;
-  background: var(--input-background, #1e1f22);
-  color: var(--text-normal, #dbdee1);
-  font: inherit;
-  font-size: 13px;
-}
-
 .awaytimer-native-menu-group {
   display: contents;
 }
@@ -866,37 +695,34 @@ var require_styles = __commonJS({
 // src/index.js
 var { ManualStatusTimer } = require_manualStatusTimer();
 var { MenuInjector } = require_menuInjector();
-var { QuickLauncher } = require_quickLauncher();
 var { SettingsStore } = require_settings();
 var { createSettingsPanel } = require_settingsPanel();
 var { StatusAdapter } = require_statusAdapter();
 var styles = require_styles();
-var AwayTimer = class {
+var StatusTimer = class {
   constructor(meta) {
     this.meta = meta;
     this.settings = null;
     this.statusAdapter = null;
     this.manualTimer = null;
     this.menuInjector = null;
-    this.quickLauncher = null;
   }
   start() {
     BdApi.DOM.addStyle(this.meta.name, styles);
     this.settings = new SettingsStore({
       onChange: () => {
         this.menuInjector?.refresh();
-        this.syncQuickLauncher();
       }
     });
     this.statusAdapter = new StatusAdapter({
-      logger: (message, level) => this.log(message, level)
+      logger: (message2, level) => this.log(message2, level)
     });
     this.statusAdapter.start();
     this.manualTimer = new ManualStatusTimer({
       settings: this.settings,
       statusAdapter: this.statusAdapter,
-      notify: (message) => this.notify(message),
-      logger: (message, level) => this.log(message, level)
+      notify: (message2) => this.notify(message2),
+      logger: (message2, level) => this.log(message2, level)
     });
     this.manualTimer.start();
     this.menuInjector = new MenuInjector({
@@ -904,32 +730,17 @@ var AwayTimer = class {
       manualTimer: this.manualTimer
     });
     this.menuInjector.start();
-    this.quickLauncher = new QuickLauncher({
-      settings: this.settings,
-      manualTimer: this.manualTimer
-    });
-    this.syncQuickLauncher();
-    this.notify("AwayTimer loaded. Custom times appear in Discord's Idle menu.");
+    this.notify("StatusTimer loaded. Custom times appear in Discord's status menus.");
   }
   stop() {
     this.menuInjector?.stop();
-    this.quickLauncher?.stop();
     this.manualTimer?.stop();
     this.statusAdapter?.stop();
     this.menuInjector = null;
-    this.quickLauncher = null;
     this.manualTimer = null;
     this.statusAdapter = null;
     this.settings = null;
     BdApi.DOM.removeStyle(this.meta.name);
-  }
-  syncQuickLauncher() {
-    if (!this.quickLauncher || !this.settings) return;
-    if (this.settings.get("showQuickButton")) {
-      if (!this.quickLauncher.root) this.quickLauncher.start();
-      return;
-    }
-    if (this.quickLauncher.root) this.quickLauncher.stop();
   }
   getSettingsPanel() {
     if (!this.settings || !this.manualTimer) return document.createElement("div");
@@ -938,13 +749,13 @@ var AwayTimer = class {
       manualTimer: this.manualTimer
     });
   }
-  notify(message) {
+  notify(message2) {
     if (this.settings?.get("showToasts") === false) return;
-    BdApi.UI?.showToast?.(message);
+    BdApi.UI?.showToast?.(message2);
   }
-  log(message, level = "debug") {
+  log(message2, level = "debug") {
     const logger = level === "warn" ? console.warn : console.debug;
-    logger(`[${this.meta.name}] ${message}`);
+    logger(`[${this.meta.name}] ${message2}`);
   }
 };
-module.exports = AwayTimer;
+module.exports = StatusTimer;

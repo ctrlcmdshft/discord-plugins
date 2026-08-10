@@ -4,9 +4,9 @@ const {spawnSync} = require("node:child_process");
 
 const root = path.resolve(__dirname, "..");
 const plugins = {
-  AwayTimer: {
-    dir: path.join(root, "plugins", "AwayTimer"),
-    artifact: "AwayTimer.plugin.js"
+  StatusTimer: {
+    dir: path.join(root, "plugins", "StatusTimer"),
+    artifact: "StatusTimer.plugin.js"
   },
   CommandCenter: {
     dir: path.join(root, "plugins", "CommandCenter"),

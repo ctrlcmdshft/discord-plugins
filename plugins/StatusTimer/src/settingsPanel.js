@@ -31,51 +31,37 @@ function createSettingsPanel({settings, manualTimer}) {
         .awaytimer-switch.is-on::after { transform: translateX(18px); }
       </style>
       <div class="awaytimer-section">
-        <div class="awaytimer-title">Custom Idle Timers</div>
-        <div class="awaytimer-note">Set Idle for your own durations instead of Discord's fixed 15m, 1h, 8h, 24h, 3d, and Forever choices.</div>
+        <div class="awaytimer-title">Status Timers</div>
+        <div class="awaytimer-note">Replace Discord's timed status choices with editable presets for Idle and Do Not Disturb.</div>
         ${activeTimer ? renderActiveTimer(activeTimer) : ""}
-        <div class="awaytimer-buttons">
-          ${settings.get("manualPresets").map((minutes) => `
-            <button class="awaytimer-button" data-minutes="${minutes}">${formatMinutes(minutes)}</button>
-          `).join("")}
-        </div>
       </div>
+      ${renderPresetSection("idle", "Idle Presets", settings.get("idlePresets"))}
+      ${renderPresetSection("dnd", "Do Not Disturb Presets", settings.get("dndPresets"))}
       <div class="awaytimer-section">
-        <div class="awaytimer-field">
-          <label class="awaytimer-title" for="awaytimer-presets">Preset minutes</label>
-          <div class="awaytimer-note">Comma-separated minutes. Defaults match Discord: 15, 60, 480, 1440, 4320. Saved edits remain after updates.</div>
-          <input id="awaytimer-presets" class="awaytimer-input" value="${escapeAttribute(settings.get("manualPresets").join(", "))}" />
-        </div>
-        <div class="awaytimer-actions">
-          <button class="awaytimer-button secondary" data-save-presets>Save Presets</button>
-          <button class="awaytimer-button neutral" data-reset-presets>Reset Presets</button>
-        </div>
-        <div class="awaytimer-status">${escapeAttribute(message)}</div>
-      </div>
-      <div class="awaytimer-section">
-        ${renderSwitch("restoreManualTimersToOnline", "Manual Timers Return To Online", "When a custom Idle timer ends, set your status back to Online instead of restoring the previous status.", settings.get("restoreManualTimersToOnline"))}
-        ${renderSwitch("showQuickButton", "Show Floating Quick Button", "Shows the old Away button near the lower-left user panel as a fallback.", settings.get("showQuickButton"))}
-        ${renderSwitch("showToasts", "Show Toasts", "Shows a small notice when AwayTimer changes your status.", settings.get("showToasts"))}
+        ${renderSwitch("restoreManualTimersToOnline", "Timers Return To Online", "When a custom status timer ends, set your status back to Online instead of restoring the previous status.", settings.get("restoreManualTimersToOnline"))}
+        ${renderSwitch("showToasts", "Show Toasts", "Shows a small notice when StatusTimer changes your status.", settings.get("showToasts"))}
       </div>
     `;
   };
 
   root.addEventListener("click", (event) => {
     const minutesButton = event.target.closest("[data-minutes]");
-    if (minutesButton) manualTimer.setIdleForMinutes(minutesButton.dataset.minutes);
+    if (minutesButton) manualTimer.setStatusForMinutes(minutesButton.dataset.statusKind, minutesButton.dataset.minutes);
 
     if (event.target.closest("[data-save-presets]")) {
-      const input = root.querySelector("#awaytimer-presets");
+      const statusKind = event.target.closest("[data-save-presets]").dataset.statusKind;
+      const input = root.querySelector(`[data-preset-input="${statusKind}"]`);
       const {presets, invalidCount} = parsePresetTextDetailed(input.value);
-      settings.set("manualPresets", presets);
-      message = `Saved ${presets.length} preset${presets.length === 1 ? "" : "s"}.`;
+      settings.set(`${statusKind}Presets`, presets);
+      message = `Saved ${labelStatusKind(statusKind)} presets.`;
       if (invalidCount) message += ` Ignored ${invalidCount} invalid value${invalidCount === 1 ? "" : "s"}.`;
       render();
     }
 
     if (event.target.closest("[data-reset-presets]")) {
-      settings.set("manualPresets", DEFAULT_SETTINGS.manualPresets);
-      message = "Reset to Discord defaults.";
+      const statusKind = event.target.closest("[data-reset-presets]").dataset.statusKind;
+      settings.set(`${statusKind}Presets`, DEFAULT_SETTINGS[`${statusKind}Presets`]);
+      message = `Reset ${labelStatusKind(statusKind)} presets to Discord defaults.`;
       render();
     }
 
@@ -103,11 +89,37 @@ function renderActiveTimer(activeTimer) {
     <div class="awaytimer-active">
       <div>
         <div class="awaytimer-title">Active Timer</div>
-        <div class="awaytimer-note">Idle until ${escapeAttribute(formatClockTime(activeTimer.expiresAt))}. About ${escapeAttribute(formatMinutes(remainingMinutes))} remaining.</div>
+        <div class="awaytimer-note">${escapeAttribute(labelStatusKind(activeTimer.status))} until ${escapeAttribute(formatClockTime(activeTimer.expiresAt))}. About ${escapeAttribute(formatMinutes(remainingMinutes))} remaining.</div>
       </div>
       <button class="awaytimer-button neutral" data-cancel-timer>Cancel Timer</button>
     </div>
   `;
+}
+
+function renderPresetSection(statusKind, title, presets) {
+  return `
+    <div class="awaytimer-section">
+      <div class="awaytimer-field">
+        <label class="awaytimer-title">${escapeAttribute(title)}</label>
+        <div class="awaytimer-note">Comma-separated minutes. Defaults match Discord: 15, 60, 480, 1440, 4320. Saved edits remain after updates.</div>
+        <input class="awaytimer-input" data-preset-input="${escapeAttribute(statusKind)}" value="${escapeAttribute(presets.join(", "))}" />
+      </div>
+      <div class="awaytimer-buttons">
+        ${presets.map((minutes) => `
+          <button class="awaytimer-button" data-status-kind="${escapeAttribute(statusKind)}" data-minutes="${minutes}">${formatMinutes(minutes)}</button>
+        `).join("")}
+      </div>
+      <div class="awaytimer-actions">
+        <button class="awaytimer-button secondary" data-status-kind="${escapeAttribute(statusKind)}" data-save-presets>Save Presets</button>
+        <button class="awaytimer-button neutral" data-status-kind="${escapeAttribute(statusKind)}" data-reset-presets>Reset Presets</button>
+      </div>
+      <div class="awaytimer-status">${escapeAttribute(message)}</div>
+    </div>
+  `;
+}
+
+function labelStatusKind(statusKind) {
+  return statusKind === "dnd" ? "Do Not Disturb" : "Idle";
 }
 
 function renderSwitch(id, title, note, enabled) {

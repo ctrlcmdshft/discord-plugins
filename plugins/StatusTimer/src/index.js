@@ -1,19 +1,17 @@
 const {ManualStatusTimer} = require("./manualStatusTimer");
 const {MenuInjector} = require("./menuInjector");
-const {QuickLauncher} = require("./quickLauncher");
 const {SettingsStore} = require("./settings");
 const {createSettingsPanel} = require("./settingsPanel");
 const {StatusAdapter} = require("./statusAdapter");
 const styles = require("./styles");
 
-class AwayTimer {
+class StatusTimer {
   constructor(meta) {
     this.meta = meta;
     this.settings = null;
     this.statusAdapter = null;
     this.manualTimer = null;
     this.menuInjector = null;
-    this.quickLauncher = null;
   }
 
   start() {
@@ -21,7 +19,6 @@ class AwayTimer {
     this.settings = new SettingsStore({
       onChange: () => {
         this.menuInjector?.refresh();
-        this.syncQuickLauncher();
       }
     });
     this.statusAdapter = new StatusAdapter({
@@ -40,35 +37,19 @@ class AwayTimer {
       manualTimer: this.manualTimer
     });
     this.menuInjector.start();
-    this.quickLauncher = new QuickLauncher({
-      settings: this.settings,
-      manualTimer: this.manualTimer
-    });
-    this.syncQuickLauncher();
 
-    this.notify("AwayTimer loaded. Custom times appear in Discord's Idle menu.");
+    this.notify("StatusTimer loaded. Custom times appear in Discord's status menus.");
   }
 
   stop() {
     this.menuInjector?.stop();
-    this.quickLauncher?.stop();
     this.manualTimer?.stop();
     this.statusAdapter?.stop();
     this.menuInjector = null;
-    this.quickLauncher = null;
     this.manualTimer = null;
     this.statusAdapter = null;
     this.settings = null;
     BdApi.DOM.removeStyle(this.meta.name);
-  }
-
-  syncQuickLauncher() {
-    if (!this.quickLauncher || !this.settings) return;
-    if (this.settings.get("showQuickButton")) {
-      if (!this.quickLauncher.root) this.quickLauncher.start();
-      return;
-    }
-    if (this.quickLauncher.root) this.quickLauncher.stop();
   }
 
   getSettingsPanel() {
@@ -90,4 +71,4 @@ class AwayTimer {
   }
 }
 
-module.exports = AwayTimer;
+module.exports = StatusTimer;

@@ -15,7 +15,7 @@ const meta = [
   " */"
 ].join("\n");
 
-const outfile = path.join(root, "dist", "AwayTimer.plugin.js");
+const outfile = path.join(root, "dist", "StatusTimer.plugin.js");
 const options = {
   entryPoints: [path.join(root, "src", "index.js")],
   bundle: true,

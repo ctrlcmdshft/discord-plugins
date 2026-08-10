@@ -1,25 +1,27 @@
-const PLUGIN_NAME = "AwayTimer";
+const PLUGIN_NAME = "StatusTimer";
+const LEGACY_PLUGIN_NAME = "AwayTimer";
 
 const DEFAULT_SETTINGS = Object.freeze({
-  manualPresets: [15, 60, 480, 1440, 4320],
+  idlePresets: [15, 60, 480, 1440, 4320],
+  dndPresets: [15, 60, 480, 1440, 4320],
   customDurationMinutes: 30,
   restoreManualTimersToOnline: true,
-  showQuickButton: false,
   showToasts: true
 });
 
 function normalizeSettings(value = {}) {
+  const legacyPresets = value.manualPresets;
   return {
-    manualPresets: normalizePresets(value.manualPresets),
+    idlePresets: normalizePresets(value.idlePresets || legacyPresets),
+    dndPresets: normalizePresets(value.dndPresets || legacyPresets),
     customDurationMinutes: clampNumber(value.customDurationMinutes, DEFAULT_SETTINGS.customDurationMinutes, 1, 4320),
     restoreManualTimersToOnline: value.restoreManualTimersToOnline !== undefined ? Boolean(value.restoreManualTimersToOnline) : DEFAULT_SETTINGS.restoreManualTimersToOnline,
-    showQuickButton: value.showQuickButton !== undefined ? Boolean(value.showQuickButton) : DEFAULT_SETTINGS.showQuickButton,
     showToasts: value.showToasts !== undefined ? Boolean(value.showToasts) : DEFAULT_SETTINGS.showToasts
   };
 }
 
 function normalizePresets(value) {
-  const presets = Array.isArray(value) ? value : DEFAULT_SETTINGS.manualPresets;
+  const presets = Array.isArray(value) ? value : DEFAULT_SETTINGS.idlePresets;
   const normalized = presets
     .map((item) => Math.round(Number(item)))
     .filter((item) => Number.isFinite(item) && item > 0 && item <= 4320);
@@ -61,7 +63,10 @@ function clampNumber(value, fallback, min, max) {
 class SettingsStore {
   constructor({onChange} = {}) {
     this.onChange = onChange;
-    this.values = normalizeSettings(BdApi.Data.load(PLUGIN_NAME, "settings"));
+    const stored = BdApi.Data.load(PLUGIN_NAME, "settings");
+    const legacyStored = stored ? null : BdApi.Data.load(LEGACY_PLUGIN_NAME, "settings");
+    this.values = normalizeSettings(stored || legacyStored);
+    if (!stored && legacyStored) BdApi.Data.save(PLUGIN_NAME, "settings", this.values);
   }
 
   get all() {
@@ -90,16 +95,9 @@ class SettingsStore {
         },
         {
           type: "switch",
-          id: "showQuickButton",
-          name: "Show Floating Quick Button",
-          note: "Shows the old Away button near the lower-left user panel as a fallback.",
-          value: this.values.showQuickButton
-        },
-        {
-          type: "switch",
           id: "showToasts",
           name: "Show Toasts",
-          note: "Shows a small notice when AwayTimer changes your status.",
+          note: "Shows a small notice when StatusTimer changes your status.",
           value: this.values.showToasts
         }
       ],

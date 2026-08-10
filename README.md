@@ -4,14 +4,14 @@ Private BetterDiscord plugin workspace for plugins created by ctrlcmdshft.
 
 ## Plugins
 
-- `plugins/AwayTimer` - Custom Idle duration presets that replace Discord's default Idle duration menu choices while preserving user-edited presets across updates.
+- `plugins/StatusTimer` - Custom Idle and Do Not Disturb duration presets that replace Discord's default status duration choices while preserving user-edited presets across updates.
 - `plugins/CommandCenter` - Raycast-style Discord command palette prototype.
 
 ## Releases
 
 Built BetterDiscord-ready single-file plugins are copied into `releases/`:
 
-- `releases/AwayTimer.plugin.js`
+- `releases/StatusTimer.plugin.js`
 - `releases/CommandCenter.plugin.js`
 
 ## Development
@@ -25,7 +25,7 @@ npm run build
 Build one plugin:
 
 ```sh
-npm run build:awaytimer
+npm run build:statustimer
 npm run build:commandcenter
 ```
 
@@ -35,10 +35,10 @@ Test all plugins:
 npm test
 ```
 
-Install AwayTimer locally:
+Install StatusTimer locally:
 
 ```sh
-cp releases/AwayTimer.plugin.js "$HOME/Library/Application Support/BetterDiscord/plugins/AwayTimer.plugin.js"
+cp releases/StatusTimer.plugin.js "$HOME/Library/Application Support/BetterDiscord/plugins/StatusTimer.plugin.js"
 ```
 
 Install CommandCenter locally:
@@ -52,7 +52,7 @@ cp releases/CommandCenter.plugin.js "$HOME/Library/Application Support/BetterDis
 Use the `Build Plugins` workflow from GitHub's Actions tab. The manual run form lets you choose:
 
 - `all`
-- `AwayTimer`
+- `StatusTimer`
 - `CommandCenter`
 
 The workflow uploads the built `.plugin.js` files as artifacts.

@@ -5,10 +5,10 @@
   "description": "Private BetterDiscord plugin workspace.",
   "scripts": {
     "build": "node scripts/build-selected.js all",
-    "build:awaytimer": "node scripts/build-selected.js AwayTimer",
+    "build:statustimer": "node scripts/build-selected.js StatusTimer",
     "build:commandcenter": "node scripts/build-selected.js CommandCenter",
-    "test": "npm --prefix plugins/AwayTimer test && npm --prefix plugins/CommandCenter test",
-    "sync:releases": "cp plugins/AwayTimer/dist/AwayTimer.plugin.js releases/AwayTimer.plugin.js && cp plugins/CommandCenter/dist/CommandCenter.plugin.js releases/CommandCenter.plugin.js"
+    "test": "npm --prefix plugins/StatusTimer test && npm --prefix plugins/CommandCenter test",
+    "sync:releases": "cp plugins/StatusTimer/dist/StatusTimer.plugin.js releases/StatusTimer.plugin.js && cp plugins/CommandCenter/dist/CommandCenter.plugin.js releases/CommandCenter.plugin.js"
   },
   "author": "ctrlcmdshft",
   "license": "MIT"
