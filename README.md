@@ -22,6 +22,13 @@ Build all plugins:
 npm run build
 ```
 
+Build one plugin:
+
+```sh
+npm run build:awaytimer
+npm run build:commandcenter
+```
+
 Test all plugins:
 
 ```sh
@@ -39,3 +46,13 @@ Install CommandCenter locally:
 ```sh
 cp releases/CommandCenter.plugin.js "$HOME/Library/Application Support/BetterDiscord/plugins/CommandCenter.plugin.js"
 ```
+
+## GitHub Actions
+
+Use the `Build Plugins` workflow from GitHub's Actions tab. The manual run form lets you choose:
+
+- `all`
+- `AwayTimer`
+- `CommandCenter`
+
+The workflow uploads the built `.plugin.js` files as artifacts.

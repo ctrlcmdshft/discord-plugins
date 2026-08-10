@@ -4,7 +4,9 @@
   "private": true,
   "description": "Private BetterDiscord plugin workspace.",
   "scripts": {
-    "build": "npm --prefix plugins/AwayTimer run build && npm --prefix plugins/CommandCenter run build && npm run sync:releases",
+    "build": "node scripts/build-selected.js all",
+    "build:awaytimer": "node scripts/build-selected.js AwayTimer",
+    "build:commandcenter": "node scripts/build-selected.js CommandCenter",
     "test": "npm --prefix plugins/AwayTimer test && npm --prefix plugins/CommandCenter test",
     "sync:releases": "cp plugins/AwayTimer/dist/AwayTimer.plugin.js releases/AwayTimer.plugin.js && cp plugins/CommandCenter/dist/CommandCenter.plugin.js releases/CommandCenter.plugin.js"
   },

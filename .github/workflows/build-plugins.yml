@@ -1,0 +1,41 @@
+name: Build Plugins
+
+on:
+  workflow_dispatch:
+    inputs:
+      plugin:
+        description: Plugin to build
+        required: true
+        default: all
+        type: choice
+        options:
+          - all
+          - AwayTimer
+          - CommandCenter
+  push:
+    branches:
+      - main
+
+jobs:
+  build:
+    name: Build ${{ github.event.inputs.plugin || 'all' }}
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Build selected plugin
+        run: node scripts/build-selected.js "${{ github.event.inputs.plugin || 'all' }}"
+
+      - name: Upload plugin artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: betterdiscord-plugins-${{ github.event.inputs.plugin || 'all' }}
+          path: releases/*.plugin.js
+          if-no-files-found: error
