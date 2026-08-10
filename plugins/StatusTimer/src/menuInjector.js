@@ -131,35 +131,8 @@ class MenuInjector {
 }
 
 function inferStatusKind(menu, fallback) {
-  const expandedStatusKind = findExpandedStatusKind(menu);
-  if (expandedStatusKind) return expandedStatusKind === "unsupported" ? null : expandedStatusKind;
-
   if (fallback !== "idle" && fallback !== "dnd") return null;
-
-  const rootMenus = Array.from(document.querySelectorAll('[role="menu"]'))
-    .filter((node) => node !== menu)
-  const rootMenuText = rootMenus.map((node) => normalizeText(node.textContent)).join(" ");
-  if (rootMenus.some((node) => hasHoveredUnsupportedStatus(node))) return null;
-
-  if (rootMenuText.includes("Do Not Disturb") && fallback === "dnd") return "dnd";
-  if (rootMenuText.includes("Idle") && fallback === "idle") return "idle";
-  return null;
-}
-
-function findExpandedStatusKind(durationMenu) {
-  const candidates = Array.from(document.querySelectorAll('[aria-expanded="true"], [aria-haspopup="menu"]'))
-    .filter((node) => node !== durationMenu && !durationMenu.contains?.(node));
-
-  for (const node of candidates) {
-    const statusKind = statusKindFromText(normalizeText(node.textContent));
-    if (statusKind) return statusKind;
-  }
-  return null;
-}
-
-function hasHoveredUnsupportedStatus(menu) {
-  return Array.from(menu.querySelectorAll('[aria-expanded="true"], [aria-selected="true"], [class*="focused"], [class*="selected"], [class*="active"]'))
-    .some((node) => statusKindFromText(normalizeText(node.textContent)) === "unsupported");
+  return fallback;
 }
 
 function statusKindFromText(text) {

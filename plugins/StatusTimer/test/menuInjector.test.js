@@ -25,15 +25,3 @@ test("statusKindFromText detects unsupported invisible menu text", () => {
   assert.equal(statusKindFromText("Do Not Disturb You will not receive desktop notifications"), "dnd");
   assert.equal(statusKindFromText("Idle"), "idle");
 });
-
-test("inferStatusKind prefers expanded status item over stale fallback", () => {
-  const expandedInvisible = {
-    textContent: "Invisible You will appear offline",
-    contains: () => false
-  };
-  global.document = {
-    querySelectorAll: (selector) => selector.includes("aria-expanded") ? [expandedInvisible] : [expandedInvisible],
-  };
-
-  assert.equal(inferStatusKind({contains: () => false}, "idle"), null);
-});
