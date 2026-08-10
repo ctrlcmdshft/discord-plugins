@@ -8,16 +8,21 @@ function createSettingsPanel({settings, manualTimer}) {
   const render = () => {
     root.innerHTML = `
       <style>
-        .awaytimer-panel { color: var(--text-normal); display: grid; gap: 18px; padding: 8px 0; }
-        .awaytimer-section { display: grid; gap: 10px; }
-        .awaytimer-title { font-size: 16px; font-weight: 700; }
+        .awaytimer-panel { color: var(--text-normal); display: grid; gap: 22px; padding: 8px 0; }
+        .awaytimer-section { display: grid; gap: 12px; }
+        .awaytimer-title { font-size: 16px; font-weight: 700; color: var(--header-primary, #f2f3f5); }
         .awaytimer-note { color: var(--text-muted); font-size: 13px; line-height: 1.4; }
         .awaytimer-buttons { display: flex; flex-wrap: wrap; gap: 8px; }
-        .awaytimer-button { border: 0; border-radius: 6px; padding: 8px 12px; background: var(--brand-500, #5865f2); color: white; cursor: pointer; font-weight: 600; }
-        .awaytimer-button.secondary { background: var(--background-modifier-selected); color: var(--text-normal); }
+        .awaytimer-button { min-height: 38px; border: 0; border-radius: 6px; padding: 8px 14px; background: var(--brand-500, #5865f2); color: white; cursor: pointer; font-weight: 700; font-size: 14px; }
+        .awaytimer-button:hover { filter: brightness(1.08); }
+        .awaytimer-button.secondary { justify-self: start; min-width: 132px; background: var(--brand-500, #5865f2); color: white; }
         .awaytimer-field { display: grid; gap: 6px; }
-        .awaytimer-input { max-width: 360px; border: 1px solid var(--background-modifier-accent); border-radius: 6px; padding: 8px 10px; background: var(--input-background); color: var(--text-normal); }
-        .awaytimer-row { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+        .awaytimer-input { width: min(520px, 100%); box-sizing: border-box; border: 1px solid var(--background-modifier-accent); border-radius: 6px; padding: 10px 12px; background: var(--input-background); color: var(--text-normal); font: inherit; font-size: 15px; }
+        .awaytimer-setting { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 18px; align-items: center; padding-top: 4px; }
+        .awaytimer-switch { position: relative; width: 42px; height: 24px; border: 0; border-radius: 999px; background: var(--background-modifier-accent, #4e5058); cursor: pointer; }
+        .awaytimer-switch::after { content: ""; position: absolute; top: 3px; left: 3px; width: 18px; height: 18px; border-radius: 50%; background: #fff; transition: transform 140ms ease; }
+        .awaytimer-switch.is-on { background: var(--brand-500, #5865f2); }
+        .awaytimer-switch.is-on::after { transform: translateX(18px); }
       </style>
       <div class="awaytimer-section">
         <div class="awaytimer-title">Custom Idle Timers</div>
@@ -36,8 +41,12 @@ function createSettingsPanel({settings, manualTimer}) {
         </div>
         <button class="awaytimer-button secondary" data-save-presets>Save Presets</button>
       </div>
+      <div class="awaytimer-section">
+        ${renderSwitch("restoreManualTimersToOnline", "Manual Timers Return To Online", "When a custom Idle timer ends, set your status back to Online instead of restoring the previous status.", settings.get("restoreManualTimersToOnline"))}
+        ${renderSwitch("showQuickButton", "Show Floating Quick Button", "Shows the old Away button near the lower-left user panel as a fallback.", settings.get("showQuickButton"))}
+        ${renderSwitch("showToasts", "Show Toasts", "Shows a small notice when AwayTimer changes your status.", settings.get("showToasts"))}
+      </div>
     `;
-    root.append(settings.getSettingsPanel());
   };
 
   root.addEventListener("click", (event) => {
@@ -51,10 +60,29 @@ function createSettingsPanel({settings, manualTimer}) {
     }
 
     if (event.target.closest("[data-cancel-timer]")) manualTimer.cancel({restore: true});
+
+    const switchButton = event.target.closest("[data-toggle-setting]");
+    if (switchButton) {
+      const key = switchButton.dataset.toggleSetting;
+      settings.set(key, !settings.get(key));
+      render();
+    }
   });
 
   render();
   return root;
+}
+
+function renderSwitch(id, title, note, enabled) {
+  return `
+    <div class="awaytimer-setting">
+      <div>
+        <div class="awaytimer-title">${escapeAttribute(title)}</div>
+        <div class="awaytimer-note">${escapeAttribute(note)}</div>
+      </div>
+      <button class="awaytimer-switch ${enabled ? "is-on" : ""}" data-toggle-setting="${escapeAttribute(id)}" aria-label="${escapeAttribute(title)}" aria-pressed="${enabled}"></button>
+    </div>
+  `;
 }
 
 function escapeAttribute(value) {
