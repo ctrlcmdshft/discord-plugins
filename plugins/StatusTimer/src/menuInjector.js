@@ -55,13 +55,11 @@ class MenuInjector {
   }
 
   handlePointerOver(event) {
-    const item = event.target?.closest?.('[role="menuitem"], button');
+    const item = event.target?.closest?.('[role="menuitem"], button, [class*="item"]');
     if (!item) return;
     const text = normalizeText(item.textContent);
-    if (text.startsWith("Idle")) this.lastStatusKind = "idle";
-    if (text.startsWith("Do Not Disturb")) this.lastStatusKind = "dnd";
-    if (text.startsWith("Invisible")) this.lastStatusKind = "unsupported";
-    if (text.startsWith("Online")) this.lastStatusKind = "unsupported";
+    const statusKind = statusKindFromText(text);
+    if (statusKind) this.lastStatusKind = statusKind;
   }
 
   injectIntoDurationMenus() {
@@ -133,15 +131,42 @@ class MenuInjector {
 }
 
 function inferStatusKind(menu, fallback) {
+  const expandedStatusKind = findExpandedStatusKind(menu);
+  if (expandedStatusKind) return expandedStatusKind === "unsupported" ? null : expandedStatusKind;
+
   if (fallback !== "idle" && fallback !== "dnd") return null;
 
-  const rootMenuText = Array.from(document.querySelectorAll('[role="menu"]'))
+  const rootMenus = Array.from(document.querySelectorAll('[role="menu"]'))
     .filter((node) => node !== menu)
-    .map((node) => normalizeText(node.textContent))
-    .join(" ");
+  const rootMenuText = rootMenus.map((node) => normalizeText(node.textContent)).join(" ");
+  if (rootMenus.some((node) => hasHoveredUnsupportedStatus(node))) return null;
 
   if (rootMenuText.includes("Do Not Disturb") && fallback === "dnd") return "dnd";
   if (rootMenuText.includes("Idle") && fallback === "idle") return "idle";
+  return null;
+}
+
+function findExpandedStatusKind(durationMenu) {
+  const candidates = Array.from(document.querySelectorAll('[aria-expanded="true"], [aria-haspopup="menu"]'))
+    .filter((node) => node !== durationMenu && !durationMenu.contains?.(node));
+
+  for (const node of candidates) {
+    const statusKind = statusKindFromText(normalizeText(node.textContent));
+    if (statusKind) return statusKind;
+  }
+  return null;
+}
+
+function hasHoveredUnsupportedStatus(menu) {
+  return Array.from(menu.querySelectorAll('[aria-expanded="true"], [aria-selected="true"], [class*="focused"], [class*="selected"], [class*="active"]'))
+    .some((node) => statusKindFromText(normalizeText(node.textContent)) === "unsupported");
+}
+
+function statusKindFromText(text) {
+  if (text.includes("Invisible")) return "unsupported";
+  if (text.includes("Online")) return "unsupported";
+  if (text.includes("Do Not Disturb")) return "dnd";
+  if (text.includes("Idle")) return "idle";
   return null;
 }
 
@@ -210,5 +235,6 @@ function closeDiscordMenu() {
 
 module.exports = {
   MenuInjector,
-  inferStatusKind
+  inferStatusKind,
+  statusKindFromText
 };
