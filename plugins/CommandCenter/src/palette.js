@@ -12,12 +12,14 @@ class CommandPalette {
     this.input = null;
     this.resultsNode = null;
     this.hasPointerSelection = false;
+    this.channelScope = null;
   }
 
   open() {
     if (!this.root) this.mount();
     this.isOpen = true;
     this.query = "";
+    this.channelScope = null;
     this.selectedIndex = 0;
     this.hasPointerSelection = false;
     this.root.hidden = false;
@@ -30,6 +32,7 @@ class CommandPalette {
     if (!this.root) return;
     this.isOpen = false;
     this.root.hidden = true;
+    this.channelScope = null;
   }
 
   toggle() {
@@ -96,6 +99,10 @@ class CommandPalette {
   handleKeyDown(event) {
     if (event.key === "Escape") {
       event.preventDefault();
+      if (this.channelScope) {
+        this.clearChannelScope();
+        return;
+      }
       this.close();
       return;
     }
@@ -124,7 +131,9 @@ class CommandPalette {
   }
 
   updateResults() {
-    this.results = fuzzySearch(this.query, this.registry.list(), 10);
+    const limit = this.registry.context.settings.get("resultLimit");
+    const commands = this.channelScope ? this.getScopedCommands() : this.getTopLevelCommands();
+    this.results = fuzzySearch(this.query, commands, limit);
     this.selectedIndex = Math.min(this.selectedIndex, Math.max(this.results.length - 1, 0));
     this.renderResults();
   }
@@ -137,7 +146,8 @@ class CommandPalette {
       return;
     }
 
-    this.resultsNode.innerHTML = this.results.map((command, index) => `
+    const scopeHeader = this.channelScope ? `<div class="cc-scope">Channels in <strong>${escapeHtml(this.channelScope.name)}</strong> <span>Esc to go back</span></div>` : "";
+    this.resultsNode.innerHTML = scopeHeader + this.results.map((command, index) => `
       <button class="cc-result ${index === this.selectedIndex ? "is-selected" : ""}"
         data-command-id="${escapeAttribute(command.id)}" data-command-index="${index}" role="option"
         aria-selected="${index === this.selectedIndex}">
@@ -154,12 +164,64 @@ class CommandPalette {
 
   async runCommand(commandId) {
     try {
-      await this.registry.run(commandId);
-      this.close();
+      if (commandId === "palette.exit-channel-scope") {
+        this.clearChannelScope();
+        return;
+      }
+      const command = await this.registry.run(commandId);
+      if (!command?.keepOpen) this.close();
     } catch (error) {
       console.error("[CommandCenter]", error);
       this.notify("Command failed. See console for details.", {type: "error"});
     }
+  }
+
+  getTopLevelCommands() {
+    return this.registry.list().filter((command) => command.category !== "Channels");
+  }
+
+  getScopedCommands() {
+    const back = {
+      id: "palette.exit-channel-scope",
+      title: "Back to Servers",
+      subtitle: "Choose a different server",
+      category: "Navigation",
+      priority: 200,
+      keywords: ["back", "servers", "cancel"]
+    };
+    const storedChannels = this.registry.list().filter((command) =>
+      command.category === "Channels" && command.guildId === this.channelScope.guildId
+    );
+    const visibleChannels = (this.channelScope.visibleChannels || []).map((channel) => ({
+      id: `visible-channel.${channel.id}`,
+      title: channel.title,
+      subtitle: channel.guildName,
+      category: "Channels",
+      priority: 50,
+      keywords: ["channel", "jump", channel.guildName],
+      run: ({discord}) => discord.jumpToChannel(channel.id, channel.guildId)
+    }));
+    return [back, ...(visibleChannels.length ? visibleChannels : storedChannels)];
+  }
+
+  async showChannelsForGuild(guild) {
+    this.channelScope = {guildId: guild.id, name: guild.name, visibleChannels: []};
+    this.query = "";
+    if (this.input) this.input.value = "";
+    this.updateResults();
+    this.registry.context.discord.jumpToGuild(guild.id);
+    await new Promise((resolve) => globalThis.setTimeout(resolve, 180));
+    if (!this.channelScope || this.channelScope.guildId !== guild.id) return;
+    this.channelScope.visibleChannels = this.registry.context.discord.getVisibleGuildTextChannels(guild);
+    this.updateResults();
+    requestAnimationFrame(() => this.input?.focus());
+  }
+
+  clearChannelScope() {
+    this.channelScope = null;
+    this.query = "";
+    if (this.input) this.input.value = "";
+    this.updateResults();
   }
 }
 

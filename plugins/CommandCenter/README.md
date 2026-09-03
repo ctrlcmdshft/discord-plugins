@@ -2,7 +2,7 @@
 
 CommandCenter is a BetterDiscord plugin foundation for a Raycast-style command palette in Discord.
 
-## What v0.1 Includes
+## What v0.2 Includes
 
 - `Cmd+K` on macOS and `Ctrl+K` on Windows/Linux to open the palette.
 - Keyboard navigation with arrow keys, Enter, and Escape.
@@ -12,6 +12,9 @@ CommandCenter is a BetterDiscord plugin foundation for a Raycast-style command p
 - Clipboard commands for the current channel link and channel ID.
 - A command registry that can be extended without coupling new commands to the UI.
 - A fuzzy-search module with focused tests.
+- Useful actions are ranked first when the palette opens; searched results remain ranked by match quality.
+- Plugin settings to show or hide Navigation, Clipboard, Servers, Channels, Direct Messages, and Development commands.
+- An adjustable result limit (5–30) for a shorter or denser palette.
 - A build pipeline that bundles the source tree into `dist/CommandCenter.plugin.js`.
 
 This foundation deliberately avoids self-bot behavior, message automation, token access, or direct Discord API calls.
@@ -33,6 +36,8 @@ cp dist/CommandCenter.plugin.js "$HOME/Library/Application Support/BetterDiscord
 ```
 
 Restart Discord or toggle the plugin from BetterDiscord's Plugins settings. Press `Cmd+K` on macOS or `Ctrl+K` elsewhere to open the palette.
+
+Use BetterDiscord's CommandCenter settings to choose which command groups appear. Changes apply immediately to an open palette.
 
 For iterative development:
 

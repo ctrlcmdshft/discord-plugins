@@ -2,6 +2,8 @@ const styles = require("./styles");
 const {createDefaultCommands} = require("./commandRegistry");
 const {DiscordBridge} = require("./discordBridge");
 const {CommandPalette} = require("./palette");
+const {SettingsStore} = require("./settings");
+const {createSettingsPanel} = require("./settingsPanel");
 
 class CommandCenter {
   constructor(meta) {
@@ -9,11 +11,15 @@ class CommandCenter {
     this.discord = null;
     this.palette = null;
     this.registry = null;
+    this.settings = null;
     this.handleGlobalKeyDown = null;
   }
 
   start() {
     BdApi.DOM.addStyle(this.meta.name, styles);
+    this.settings = new SettingsStore({
+      onChange: () => this.palette?.updateResults()
+    });
     this.discord = new DiscordBridge({notify: (message, options) => this.notify(message, options)});
     this.discord.start();
 
@@ -21,6 +27,7 @@ class CommandCenter {
       meta: this.meta,
       notify: (message, options) => this.notify(message, options),
       discord: this.discord,
+      settings: this.settings,
       palette: null
     };
 
@@ -59,9 +66,14 @@ class CommandCenter {
     this.palette?.destroy();
     this.palette = null;
     this.registry = null;
+    this.settings = null;
     this.discord?.stop();
     this.discord = null;
     BdApi.DOM.removeStyle(this.meta.name);
+  }
+
+  getSettingsPanel() {
+    return this.settings ? createSettingsPanel({settings: this.settings}) : document.createElement("div");
   }
 
   notify(message, options = {}) {

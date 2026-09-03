@@ -11,6 +11,14 @@ const plugins = {
   CommandCenter: {
     dir: path.join(root, "plugins", "CommandCenter"),
     artifact: "CommandCenter.plugin.js"
+  },
+  FocusProfiles: {
+    dir: path.join(root, "plugins", "FocusProfiles"),
+    artifact: "FocusProfiles.plugin.js"
+  },
+  StatusDurations: {
+    dir: path.join(root, "plugins", "StatusDurations"),
+    artifact: "StatusDurations.plugin.js"
   }
 };
 

@@ -5,23 +5,30 @@ class DiscordBridge {
     this.currentChannel = null;
     this.stores = {};
     this.navigation = null;
+    this.channelActions = null;
+    this.guildActions = null;
   }
 
   start() {
     this.stores = {
       ChannelStore: getStore("ChannelStore"),
+      GuildChannelsStore: getStore("GuildChannelsStore") || getModuleByKeys("getChannels", "getDefaultChannel"),
       GuildStore: getStore("GuildStore"),
       SelectedChannelStore: getStore("SelectedChannelStore"),
       UserStore: getStore("UserStore"),
       PrivateChannelSortStore: getStore("PrivateChannelSortStore")
     };
     this.navigation = getNavigation();
+    this.channelActions = getActionModule("selectChannel");
+    this.guildActions = getActionModule("selectGuild");
     this.recordCurrentChannel();
   }
 
   stop() {
     this.stores = {};
     this.navigation = null;
+    this.channelActions = null;
+    this.guildActions = null;
     this.previousChannel = null;
     this.currentChannel = null;
   }
@@ -76,13 +83,23 @@ class DiscordBridge {
 
   getGuildTextChannels(guild) {
     const store = this.stores.ChannelStore;
+    const guildChannelsStore = this.stores.GuildChannelsStore;
     const raw =
+      call(guildChannelsStore, "getChannels", guild.id) ||
+      call(store, "getMutableBasicGuildChannelsForGuild", guild.id) ||
+      call(store, "getMutableGuildChannelsForGuild", guild.id) ||
       call(store, "getGuildChannels", guild.id) ||
       call(store, "getMutableGuildChannels", guild.id) ||
       call(store, "getChannels", guild.id) ||
       {};
 
-    return flattenChannels(raw)
+    let channels = flattenChannels(raw);
+    if (!channels.length) {
+      const channelIds = call(store, "getChannelIds", guild.id) || [];
+      channels = channelIds.map((channelId) => this.getChannel(channelId)).filter(Boolean);
+    }
+
+    return channels
       .filter((channel) => isTextLikeChannel(channel))
       .map((channel) => ({
         id: channel.id,
@@ -91,6 +108,21 @@ class DiscordBridge {
         guildName: guild.name
       }))
       .sort((first, second) => first.title.localeCompare(second.title));
+  }
+
+  getVisibleGuildTextChannels(guild) {
+    const items = Array.from(globalThis.document?.querySelectorAll?.('[data-list-item-id^="channels___"]') || []);
+    return items
+      .map((item) => {
+        const match = item.getAttribute?.("data-list-item-id")?.match(/^channels___(.+)$/);
+        const labelNode = item.querySelector?.('[class*="name"], [data-text-variant]');
+        const name = normalizeText(item.getAttribute?.("aria-label") || labelNode?.textContent || item.textContent)
+          .replace(/^text channels?\s*/i, "")
+          .replace(/^#\s*/, "");
+        if (!match?.[1] || !name) return null;
+        return {id: match[1], guildId: guild.id, title: `# ${name}`, guildName: guild.name};
+      })
+      .filter(Boolean);
   }
 
   getPrivateChannels(limit = 40) {
@@ -122,15 +154,56 @@ class DiscordBridge {
     };
   }
 
-  jumpToChannel(channelId, guildId = null) {
+  jumpToChannel(channelId, guildId = null, label = "") {
     this.recordCurrentChannel();
+    if ((guildId === "@me" || !guildId) && clickDirectMessageInList(channelId, label)) return true;
+    if ((guildId === "@me" || !guildId) && clickDirectMessagesHome()) {
+      return new Promise((resolve) => {
+        globalThis.setTimeout(() => {
+          if (clickDirectMessageInList(channelId, label)) {
+            resolve(true);
+            return;
+          }
+          resolve(this.selectChannel(channelId, guildId));
+        }, 180);
+      });
+    }
+    if (guildId && guildId !== "@me" && clickChannelInServerList(channelId)) return true;
+    return this.selectChannel(channelId, guildId);
+  }
+
+  selectChannel(channelId, guildId = null) {
+    this.channelActions = this.channelActions || getActionModule("selectChannel");
+    if (typeof this.channelActions?.selectChannel === "function") {
+      this.channelActions.selectChannel(guildId || "@me", channelId);
+      return true;
+    }
     const route = `/channels/${guildId || "@me"}/${channelId}`;
+    return this.transitionTo(route);
+  }
+
+  jumpToGuild(guildId, channelId = null) {
+    this.recordCurrentChannel();
+    if (clickGuildInServerList(guildId)) return true;
+    this.guildActions = this.guildActions || getActionModule("selectGuild");
+    if (typeof this.guildActions?.selectGuild === "function") {
+      this.guildActions.selectGuild(guildId);
+      return true;
+    }
+    if (channelId) return this.jumpToChannel(channelId, guildId);
+    const route = channelId ? `/channels/${guildId}/${channelId}` : `/channels/${guildId}`;
+    return this.transitionTo(route);
+  }
+
+  transitionTo(route) {
+    this.navigation = this.navigation || getNavigation();
     if (typeof this.navigation?.transitionTo === "function") {
       this.navigation.transitionTo(route);
-      return;
+      return true;
     }
 
-    window.location.assign(route);
+    this.notify("Command Center could not navigate in this Discord build.");
+    return false;
   }
 
   jumpToPreviousChannel() {
@@ -146,14 +219,122 @@ class DiscordBridge {
   }
 }
 
+function clickGuildInServerList(guildId) {
+  const item = globalThis.document?.querySelector?.(`[data-list-item-id="guildsnav___${guildId}"]`);
+  if (!item || typeof item.click !== "function") return false;
+
+  const target = item.querySelector?.('[role="treeitem"], [role="button"], a, button') || item;
+  target.click();
+  return true;
+}
+
+function clickChannelInServerList(channelId) {
+  const item = globalThis.document?.querySelector?.(`[data-list-item-id="channels___${channelId}"]`);
+  if (!item || typeof item.click !== "function") return false;
+
+  const target = item.querySelector?.('[role="treeitem"], [role="button"], a, button') || item;
+  target.click();
+  return true;
+}
+
+function clickDirectMessageInList(channelId, label) {
+  const document = globalThis.document;
+  const item = document?.querySelector?.(
+    `[data-list-item-id="private-channels-uid___${channelId}"], [data-list-id*="private-channels-uid"] a[href$="/${channelId}"]`
+  ) || findDirectMessageByLabel(document, label);
+  if (!item || typeof item.click !== "function") return false;
+
+  const target = item.querySelector?.('[role="treeitem"], [role="button"], a, button') || item;
+  target.click();
+  return true;
+}
+
+function clickDirectMessagesHome() {
+  const document = globalThis.document;
+  const item = document?.querySelector?.('[data-list-item-id="guildsnav___home"], [aria-label="Direct Messages"]');
+  if (!item || typeof item.click !== "function") return false;
+
+  const target = item.querySelector?.('[role="treeitem"], [role="button"], a, button') || item;
+  target.click();
+  return true;
+}
+
+function findDirectMessageByLabel(document, label) {
+  const normalizedLabel = normalizeText(label);
+  if (!normalizedLabel) return null;
+
+  return Array.from(document?.querySelectorAll?.('[data-list-id*="private-channels-uid"] [role="listitem"], [data-list-id*="private-channels-uid"] a, [data-list-item-id*="private-channels"]') || [])
+    .find((candidate) => normalizeText(candidate.textContent).includes(normalizedLabel)) || null;
+}
+
+function normalizeText(value) {
+  return String(value || "").replace(/\s+/g, " ").trim().toLowerCase();
+}
+
 function getStore(name) {
   return BdApi.Webpack?.getStore?.(name) || BdApi.Webpack?.Stores?.[name] || null;
 }
 
+function getModuleByKeys(...keys) {
+  return globalThis.BdApi?.Webpack?.getByKeys?.(...keys) || null;
+}
+
 function getNavigation() {
-  return BdApi.Webpack?.getByKeys?.("transitionTo", "replaceWith") ||
-    BdApi.Webpack?.getByKeys?.("transitionTo") ||
-    null;
+  const webpack = globalThis.BdApi?.Webpack;
+  const candidates = [
+    webpack?.getByKeys?.("transitionTo", "replaceWith"),
+    webpack?.getByKeys?.("transitionTo"),
+    webpack?.getModule?.(
+      (module) => typeof module?.transitionTo === "function",
+      {first: true, searchExports: true}
+    ),
+    webpack?.getModule?.(
+      (module) => typeof module?.default?.transitionTo === "function",
+      {first: true, searchExports: true}
+    )
+  ];
+
+  return candidates.find((candidate) => typeof candidate?.transitionTo === "function") || findNavigationInLoadedModules();
+}
+
+function getActionModule(method) {
+  const webpack = globalThis.BdApi?.Webpack;
+  const candidates = [
+    webpack?.getByKeys?.(method),
+    webpack?.getModule?.(
+      (module) => typeof module?.[method] === "function",
+      {first: true, searchExports: true}
+    )
+  ];
+  return candidates.find((candidate) => typeof candidate?.[method] === "function") || findExportInLoadedModules(method);
+}
+
+function findNavigationInLoadedModules() {
+  return findExportInLoadedModules("transitionTo");
+}
+
+function findExportInLoadedModules(method) {
+  const chunk = globalThis.webpackChunkdiscord_app;
+  if (!chunk?.push) return null;
+
+  let requireFunction = null;
+  try {
+    chunk.push([[`command-center-router-${Date.now()}`], {}, (runtime) => {
+      requireFunction = runtime;
+    }]);
+  } catch (error) {
+    console.warn("[CommandCenter] could not inspect Discord modules", error);
+    return null;
+  }
+
+  for (const module of Object.values(requireFunction?.c || {})) {
+    const exports = module?.exports;
+    const candidates = [exports, exports?.default, ...Object.values(exports || {})];
+    const matchingExport = candidates.find((candidate) => typeof candidate?.[method] === "function");
+    if (matchingExport) return matchingExport;
+  }
+
+  return null;
 }
 
 function call(target, method, ...args) {

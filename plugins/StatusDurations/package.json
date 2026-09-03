@@ -1,0 +1,11 @@
+{
+  "name": "betterdiscord-status-durations",
+  "version": "1.0.10",
+  "description": "Editable Discord status duration choices.",
+  "private": true,
+  "main": "dist/StatusDurations.plugin.js",
+  "scripts": {"build": "node scripts/build.js", "test": "node --test"},
+  "author": "ctrlcmdshft",
+  "license": "MIT",
+  "devDependencies": {"esbuild": "^0.28.2"}
+}

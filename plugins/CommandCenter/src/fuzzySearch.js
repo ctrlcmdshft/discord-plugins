@@ -44,13 +44,17 @@ function searchableText(command) {
 }
 
 function fuzzySearch(query, commands, limit = 12) {
+  const isBrowsing = !normalize(query);
   return commands
     .map((command) => {
       const result = scoreMatch(query, searchableText(command));
       return {...command, match: result};
     })
     .filter((command) => command.match.matched)
-    .sort((first, second) => second.match.score - first.match.score || first.title.localeCompare(second.title))
+    .sort((first, second) => {
+      if (isBrowsing) return (second.priority || 0) - (first.priority || 0) || first.category.localeCompare(second.category) || first.title.localeCompare(second.title);
+      return second.match.score - first.match.score || (second.priority || 0) - (first.priority || 0) || first.title.localeCompare(second.title);
+    })
     .slice(0, limit);
 }
 

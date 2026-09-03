@@ -1,8 +1,8 @@
 /**
  * @name CommandCenter
- * @author user
+ * @author ctrlcmdshft
  * @description Raycast-style command palette foundation for Discord.
- * @version 0.1.0
+ * @version 0.3.3
  */
 var __getOwnPropNames = Object.getOwnPropertyNames;
 var __commonJS = (cb, mod) => function __require() {
@@ -141,6 +141,30 @@ var require_styles = __commonJS({
   font-size: 12px;
 }
 
+.cc-settings {
+  max-width: 720px;
+  color: var(--text-normal, #dbdee1);
+}
+
+.cc-settings h2 { margin: 0 0 8px; }
+.cc-settings > p { margin: 0 0 16px; color: var(--text-muted, #949ba4); }
+
+.cc-settings-row,
+.cc-settings-limit {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 0;
+  border-top: 1px solid var(--background-modifier-accent, rgba(255, 255, 255, .08));
+  cursor: pointer;
+}
+
+.cc-settings-row input { width: 18px; height: 18px; }
+.cc-settings-row span { display: grid; gap: 3px; }
+.cc-settings-row small { color: var(--text-muted, #949ba4); }
+.cc-settings-limit { justify-content: space-between; }
+.cc-settings-limit input { width: 70px; }
+
 .cc-result-category {
   max-width: 150px;
 }
@@ -150,6 +174,18 @@ var require_styles = __commonJS({
   color: var(--text-muted, #949ba4);
   text-align: center;
 }
+
+.cc-scope {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 8px 12px 10px;
+  color: var(--text-muted, #949ba4);
+  font-size: 12px;
+}
+
+.cc-scope strong { color: var(--text-normal, #dbdee1); }
+.cc-scope span { white-space: nowrap; }
 
 .cc-footer {
   display: flex;
@@ -178,6 +214,7 @@ var require_commandRegistry = __commonJS({
         this.commands.set(command.id, {
           category: "General",
           keywords: [],
+          priority: 0,
           ...command
         });
       }
@@ -199,12 +236,21 @@ var require_commandRegistry = __commonJS({
             return [];
           }
         });
-        return [...Array.from(this.commands.values()), ...providedCommands];
+        return [...Array.from(this.commands.values()), ...providedCommands].filter((command) => {
+          if (typeof command.enabled !== "function") return true;
+          try {
+            return command.enabled(this.context);
+          } catch (error) {
+            console.warn("[CommandCenter] command availability check failed", error);
+            return false;
+          }
+        });
       }
       async run(commandId) {
         const command = this.commands.get(commandId) || this.list().find((item) => item.id === commandId);
-        if (!command) return;
+        if (!command) return null;
         await command.run(this.context);
+        return command;
       }
     };
     function createDefaultCommands2(context) {
@@ -215,6 +261,7 @@ var require_commandRegistry = __commonJS({
           title: "Close Command Center",
           subtitle: "Hide the palette",
           category: "Command Center",
+          priority: 10,
           keywords: ["escape", "dismiss"],
           run: ({ palette }) => palette.close()
         },
@@ -223,6 +270,8 @@ var require_commandRegistry = __commonJS({
           title: "Copy Current Discord Location",
           subtitle: "Copies the current Discord route or URL",
           category: "Clipboard",
+          priority: 70,
+          enabled: ({ settings }) => settings.get("showClipboard"),
           keywords: ["copy", "url", "link", "channel"],
           run: async ({ notify }) => {
             await copyText(window.location.href);
@@ -234,6 +283,8 @@ var require_commandRegistry = __commonJS({
           title: "Show Command Center Version",
           subtitle: "Display the active plugin version",
           category: "Command Center",
+          priority: 20,
+          enabled: ({ settings }) => settings.get("showDevelopment"),
           keywords: ["about", "info", "version"],
           run: ({ meta, notify }) => notify(`${meta.name} ${meta.version}`)
         },
@@ -242,6 +293,8 @@ var require_commandRegistry = __commonJS({
           title: "Reload BetterDiscord Plugin",
           subtitle: "Build again, then toggle the plugin in BetterDiscord",
           category: "Development",
+          priority: 20,
+          enabled: ({ settings }) => settings.get("showDevelopment"),
           keywords: ["dev", "build", "reload", "test"],
           run: ({ notify }) => notify("Build the plugin, then toggle CommandCenter off and on.")
         }
@@ -258,6 +311,8 @@ var require_commandRegistry = __commonJS({
           title: "Go to Previous Channel",
           subtitle: "Jump back to the last channel Command Center saw",
           category: "Navigation",
+          priority: 100,
+          enabled: ({ settings }) => settings.get("showNavigation"),
           keywords: ["back", "last", "previous", "channel"],
           run: ({ discord: discord2 }) => discord2.jumpToPreviousChannel()
         }
@@ -270,6 +325,8 @@ var require_commandRegistry = __commonJS({
             title: "Copy Current Channel Link",
             subtitle: channel?.name ? `# ${channel.name}` : "Copies a discord.com channel URL",
             category: "Clipboard",
+            priority: 90,
+            enabled: ({ settings }) => settings.get("showClipboard"),
             keywords: ["copy", "link", "url", "current", "channel"],
             run: async ({ discord: discord2, notify }) => {
               await copyText(discord2.getChannelLink(selected.channelId, selected.guildId));
@@ -281,6 +338,8 @@ var require_commandRegistry = __commonJS({
             title: "Copy Current Channel ID",
             subtitle: selected.channelId,
             category: "Clipboard",
+            priority: 80,
+            enabled: ({ settings }) => settings.get("showClipboard"),
             keywords: ["copy", "snowflake", "id", "current", "channel"],
             run: async ({ notify }) => {
               await copyText(selected.channelId);
@@ -293,13 +352,13 @@ var require_commandRegistry = __commonJS({
         commands.push({
           id: `guild.${guild.id}`,
           title: guild.name,
-          subtitle: "Server",
+          subtitle: "Browse this server's channels",
           category: "Servers",
+          priority: 50,
+          enabled: ({ settings }) => settings.get("showServers"),
           keywords: ["guild", "server", guild.name],
-          run: ({ discord: discord2 }) => {
-            const firstChannel = discord2.getGuildTextChannels(guild)[0];
-            if (firstChannel) discord2.jumpToChannel(firstChannel.id, guild.id);
-          }
+          keepOpen: true,
+          run: ({ palette }) => palette.showChannelsForGuild(guild)
         });
       }
       for (const channel of discord.getTextChannels()) {
@@ -308,6 +367,9 @@ var require_commandRegistry = __commonJS({
           title: channel.title,
           subtitle: channel.guildName,
           category: "Channels",
+          guildId: channel.guildId,
+          priority: 40,
+          enabled: ({ settings }) => settings.get("showChannels"),
           keywords: ["jump", "goto", "channel", channel.guildName],
           run: ({ discord: discord2 }) => discord2.jumpToChannel(channel.id, channel.guildId)
         });
@@ -318,8 +380,10 @@ var require_commandRegistry = __commonJS({
           title: dm.title,
           subtitle: dm.guildName,
           category: "Direct Messages",
+          priority: 60,
+          enabled: ({ settings }) => settings.get("showDirectMessages"),
           keywords: ["dm", "direct", "message", "jump", dm.title],
-          run: ({ discord: discord2 }) => discord2.jumpToChannel(dm.id, "@me")
+          run: ({ discord: discord2 }) => discord2.jumpToChannel(dm.id, "@me", dm.title)
         });
       }
       return commands;
@@ -355,21 +419,28 @@ var require_discordBridge = __commonJS({
         this.currentChannel = null;
         this.stores = {};
         this.navigation = null;
+        this.channelActions = null;
+        this.guildActions = null;
       }
       start() {
         this.stores = {
           ChannelStore: getStore("ChannelStore"),
+          GuildChannelsStore: getStore("GuildChannelsStore") || getModuleByKeys("getChannels", "getDefaultChannel"),
           GuildStore: getStore("GuildStore"),
           SelectedChannelStore: getStore("SelectedChannelStore"),
           UserStore: getStore("UserStore"),
           PrivateChannelSortStore: getStore("PrivateChannelSortStore")
         };
         this.navigation = getNavigation();
+        this.channelActions = getActionModule("selectChannel");
+        this.guildActions = getActionModule("selectGuild");
         this.recordCurrentChannel();
       }
       stop() {
         this.stores = {};
         this.navigation = null;
+        this.channelActions = null;
+        this.guildActions = null;
         this.previousChannel = null;
         this.currentChannel = null;
       }
@@ -412,13 +483,29 @@ var require_discordBridge = __commonJS({
       }
       getGuildTextChannels(guild) {
         const store = this.stores.ChannelStore;
-        const raw = call(store, "getGuildChannels", guild.id) || call(store, "getMutableGuildChannels", guild.id) || call(store, "getChannels", guild.id) || {};
-        return flattenChannels(raw).filter((channel) => isTextLikeChannel(channel)).map((channel) => ({
+        const guildChannelsStore = this.stores.GuildChannelsStore;
+        const raw = call(guildChannelsStore, "getChannels", guild.id) || call(store, "getMutableBasicGuildChannelsForGuild", guild.id) || call(store, "getMutableGuildChannelsForGuild", guild.id) || call(store, "getGuildChannels", guild.id) || call(store, "getMutableGuildChannels", guild.id) || call(store, "getChannels", guild.id) || {};
+        let channels = flattenChannels(raw);
+        if (!channels.length) {
+          const channelIds = call(store, "getChannelIds", guild.id) || [];
+          channels = channelIds.map((channelId) => this.getChannel(channelId)).filter(Boolean);
+        }
+        return channels.filter((channel) => isTextLikeChannel(channel)).map((channel) => ({
           id: channel.id,
           guildId: channel.guild_id || guild.id,
           title: `# ${channel.name}`,
           guildName: guild.name
         })).sort((first, second) => first.title.localeCompare(second.title));
+      }
+      getVisibleGuildTextChannels(guild) {
+        const items = Array.from(globalThis.document?.querySelectorAll?.('[data-list-item-id^="channels___"]') || []);
+        return items.map((item) => {
+          const match = item.getAttribute?.("data-list-item-id")?.match(/^channels___(.+)$/);
+          const labelNode = item.querySelector?.('[class*="name"], [data-text-variant]');
+          const name = normalizeText(item.getAttribute?.("aria-label") || labelNode?.textContent || item.textContent).replace(/^text channels?\s*/i, "").replace(/^#\s*/, "");
+          if (!match?.[1] || !name) return null;
+          return { id: match[1], guildId: guild.id, title: `# ${name}`, guildName: guild.name };
+        }).filter(Boolean);
       }
       getPrivateChannels(limit = 40) {
         const channelIds = call(this.stores.PrivateChannelSortStore, "getPrivateChannelIds") || call(this.stores.ChannelStore, "getSortedPrivateChannels") || [];
@@ -435,14 +522,52 @@ var require_discordBridge = __commonJS({
           guildName: "Direct Message"
         };
       }
-      jumpToChannel(channelId, guildId = null) {
+      jumpToChannel(channelId, guildId = null, label = "") {
         this.recordCurrentChannel();
+        if ((guildId === "@me" || !guildId) && clickDirectMessageInList(channelId, label)) return true;
+        if ((guildId === "@me" || !guildId) && clickDirectMessagesHome()) {
+          return new Promise((resolve) => {
+            globalThis.setTimeout(() => {
+              if (clickDirectMessageInList(channelId, label)) {
+                resolve(true);
+                return;
+              }
+              resolve(this.selectChannel(channelId, guildId));
+            }, 180);
+          });
+        }
+        if (guildId && guildId !== "@me" && clickChannelInServerList(channelId)) return true;
+        return this.selectChannel(channelId, guildId);
+      }
+      selectChannel(channelId, guildId = null) {
+        this.channelActions = this.channelActions || getActionModule("selectChannel");
+        if (typeof this.channelActions?.selectChannel === "function") {
+          this.channelActions.selectChannel(guildId || "@me", channelId);
+          return true;
+        }
         const route = `/channels/${guildId || "@me"}/${channelId}`;
+        return this.transitionTo(route);
+      }
+      jumpToGuild(guildId, channelId = null) {
+        this.recordCurrentChannel();
+        if (clickGuildInServerList(guildId)) return true;
+        this.guildActions = this.guildActions || getActionModule("selectGuild");
+        if (typeof this.guildActions?.selectGuild === "function") {
+          this.guildActions.selectGuild(guildId);
+          return true;
+        }
+        if (channelId) return this.jumpToChannel(channelId, guildId);
+        const route = channelId ? `/channels/${guildId}/${channelId}` : `/channels/${guildId}`;
+        return this.transitionTo(route);
+      }
+      transitionTo(route) {
+        this.navigation = this.navigation || getNavigation();
         if (typeof this.navigation?.transitionTo === "function") {
           this.navigation.transitionTo(route);
-          return;
+          return true;
         }
-        window.location.assign(route);
+        this.notify("Command Center could not navigate in this Discord build.");
+        return false;
       }
       jumpToPreviousChannel() {
         if (!this.previousChannel?.channelId) {
@@ -455,11 +580,101 @@ var require_discordBridge = __commonJS({
         return `https://discord.com/channels/${guildId || "@me"}/${channelId}`;
       }
     };
+    function clickGuildInServerList(guildId) {
+      const item = globalThis.document?.querySelector?.(`[data-list-item-id="guildsnav___${guildId}"]`);
+      if (!item || typeof item.click !== "function") return false;
+      const target = item.querySelector?.('[role="treeitem"], [role="button"], a, button') || item;
+      target.click();
+      return true;
+    }
+    function clickChannelInServerList(channelId) {
+      const item = globalThis.document?.querySelector?.(`[data-list-item-id="channels___${channelId}"]`);
+      if (!item || typeof item.click !== "function") return false;
+      const target = item.querySelector?.('[role="treeitem"], [role="button"], a, button') || item;
+      target.click();
+      return true;
+    }
+    function clickDirectMessageInList(channelId, label) {
+      const document2 = globalThis.document;
+      const item = document2?.querySelector?.(
+        `[data-list-item-id="private-channels-uid___${channelId}"], [data-list-id*="private-channels-uid"] a[href$="/${channelId}"]`
+      ) || findDirectMessageByLabel(document2, label);
+      if (!item || typeof item.click !== "function") return false;
+      const target = item.querySelector?.('[role="treeitem"], [role="button"], a, button') || item;
+      target.click();
+      return true;
+    }
+    function clickDirectMessagesHome() {
+      const document2 = globalThis.document;
+      const item = document2?.querySelector?.('[data-list-item-id="guildsnav___home"], [aria-label="Direct Messages"]');
+      if (!item || typeof item.click !== "function") return false;
+      const target = item.querySelector?.('[role="treeitem"], [role="button"], a, button') || item;
+      target.click();
+      return true;
+    }
+    function findDirectMessageByLabel(document2, label) {
+      const normalizedLabel = normalizeText(label);
+      if (!normalizedLabel) return null;
+      return Array.from(document2?.querySelectorAll?.('[data-list-id*="private-channels-uid"] [role="listitem"], [data-list-id*="private-channels-uid"] a, [data-list-item-id*="private-channels"]') || []).find((candidate) => normalizeText(candidate.textContent).includes(normalizedLabel)) || null;
+    }
+    function normalizeText(value) {
+      return String(value || "").replace(/\s+/g, " ").trim().toLowerCase();
+    }
     function getStore(name) {
       return BdApi.Webpack?.getStore?.(name) || BdApi.Webpack?.Stores?.[name] || null;
     }
+    function getModuleByKeys(...keys) {
+      return globalThis.BdApi?.Webpack?.getByKeys?.(...keys) || null;
+    }
     function getNavigation() {
-      return BdApi.Webpack?.getByKeys?.("transitionTo", "replaceWith") || BdApi.Webpack?.getByKeys?.("transitionTo") || null;
+      const webpack = globalThis.BdApi?.Webpack;
+      const candidates = [
+        webpack?.getByKeys?.("transitionTo", "replaceWith"),
+        webpack?.getByKeys?.("transitionTo"),
+        webpack?.getModule?.(
+          (module3) => typeof module3?.transitionTo === "function",
+          { first: true, searchExports: true }
+        ),
+        webpack?.getModule?.(
+          (module3) => typeof module3?.default?.transitionTo === "function",
+          { first: true, searchExports: true }
+        )
+      ];
+      return candidates.find((candidate) => typeof candidate?.transitionTo === "function") || findNavigationInLoadedModules();
+    }
+    function getActionModule(method) {
+      const webpack = globalThis.BdApi?.Webpack;
+      const candidates = [
+        webpack?.getByKeys?.(method),
+        webpack?.getModule?.(
+          (module3) => typeof module3?.[method] === "function",
+          { first: true, searchExports: true }
+        )
+      ];
+      return candidates.find((candidate) => typeof candidate?.[method] === "function") || findExportInLoadedModules(method);
+    }
+    function findNavigationInLoadedModules() {
+      return findExportInLoadedModules("transitionTo");
+    }
+    function findExportInLoadedModules(method) {
+      const chunk = globalThis.webpackChunkdiscord_app;
+      if (!chunk?.push) return null;
+      let requireFunction = null;
+      try {
+        chunk.push([[`command-center-router-${Date.now()}`], {}, (runtime) => {
+          requireFunction = runtime;
+        }]);
+      } catch (error) {
+        console.warn("[CommandCenter] could not inspect Discord modules", error);
+        return null;
+      }
+      for (const module3 of Object.values(requireFunction?.c || {})) {
+        const exports3 = module3?.exports;
+        const candidates = [exports3, exports3?.default, ...Object.values(exports3 || {})];
+        const matchingExport = candidates.find((candidate) => typeof candidate?.[method] === "function");
+        if (matchingExport) return matchingExport;
+      }
+      return null;
     }
     function call(target, method, ...args) {
       if (!target || typeof target[method] !== "function") return null;
@@ -560,10 +775,14 @@ var require_fuzzySearch = __commonJS({
       ].filter(Boolean).join(" ");
     }
     function fuzzySearch(query, commands, limit = 12) {
+      const isBrowsing = !normalize(query);
       return commands.map((command) => {
         const result = scoreMatch(query, searchableText(command));
         return { ...command, match: result };
-      }).filter((command) => command.match.matched).sort((first, second) => second.match.score - first.match.score || first.title.localeCompare(second.title)).slice(0, limit);
+      }).filter((command) => command.match.matched).sort((first, second) => {
+        if (isBrowsing) return (second.priority || 0) - (first.priority || 0) || first.category.localeCompare(second.category) || first.title.localeCompare(second.title);
+        return second.match.score - first.match.score || (second.priority || 0) - (first.priority || 0) || first.title.localeCompare(second.title);
+      }).slice(0, limit);
     }
     module2.exports = {
       fuzzySearch,
@@ -588,11 +807,13 @@ var require_palette = __commonJS({
         this.input = null;
         this.resultsNode = null;
         this.hasPointerSelection = false;
+        this.channelScope = null;
       }
       open() {
         if (!this.root) this.mount();
         this.isOpen = true;
         this.query = "";
+        this.channelScope = null;
         this.selectedIndex = 0;
         this.hasPointerSelection = false;
         this.root.hidden = false;
@@ -604,6 +825,7 @@ var require_palette = __commonJS({
         if (!this.root) return;
         this.isOpen = false;
         this.root.hidden = true;
+        this.channelScope = null;
       }
       toggle() {
         if (this.isOpen) this.close();
@@ -663,6 +885,10 @@ var require_palette = __commonJS({
       handleKeyDown(event) {
         if (event.key === "Escape") {
           event.preventDefault();
+          if (this.channelScope) {
+            this.clearChannelScope();
+            return;
+          }
           this.close();
           return;
         }
@@ -687,7 +913,9 @@ var require_palette = __commonJS({
         }
       }
       updateResults() {
-        this.results = fuzzySearch(this.query, this.registry.list(), 10);
+        const limit = this.registry.context.settings.get("resultLimit");
+        const commands = this.channelScope ? this.getScopedCommands() : this.getTopLevelCommands();
+        this.results = fuzzySearch(this.query, commands, limit);
         this.selectedIndex = Math.min(this.selectedIndex, Math.max(this.results.length - 1, 0));
         this.renderResults();
       }
@@ -697,7 +925,8 @@ var require_palette = __commonJS({
           this.resultsNode.innerHTML = `<div class="cc-empty">No commands found</div>`;
           return;
         }
-        this.resultsNode.innerHTML = this.results.map((command, index) => `
+        const scopeHeader = this.channelScope ? `<div class="cc-scope">Channels in <strong>${escapeHtml(this.channelScope.name)}</strong> <span>Esc to go back</span></div>` : "";
+        this.resultsNode.innerHTML = scopeHeader + this.results.map((command, index) => `
       <button class="cc-result ${index === this.selectedIndex ? "is-selected" : ""}"
         data-command-id="${escapeAttribute(command.id)}" data-command-index="${index}" role="option"
         aria-selected="${index === this.selectedIndex}">
@@ -712,12 +941,60 @@ var require_palette = __commonJS({
       }
       async runCommand(commandId) {
         try {
-          await this.registry.run(commandId);
-          this.close();
+          if (commandId === "palette.exit-channel-scope") {
+            this.clearChannelScope();
+            return;
+          }
+          const command = await this.registry.run(commandId);
+          if (!command?.keepOpen) this.close();
         } catch (error) {
           console.error("[CommandCenter]", error);
           this.notify("Command failed. See console for details.", { type: "error" });
         }
+      }
+      getTopLevelCommands() {
+        return this.registry.list().filter((command) => command.category !== "Channels");
+      }
+      getScopedCommands() {
+        const back = {
+          id: "palette.exit-channel-scope",
+          title: "Back to Servers",
+          subtitle: "Choose a different server",
+          category: "Navigation",
+          priority: 200,
+          keywords: ["back", "servers", "cancel"]
+        };
+        const storedChannels = this.registry.list().filter(
+          (command) => command.category === "Channels" && command.guildId === this.channelScope.guildId
+        );
+        const visibleChannels = (this.channelScope.visibleChannels || []).map((channel) => ({
+          id: `visible-channel.${channel.id}`,
+          title: channel.title,
+          subtitle: channel.guildName,
+          category: "Channels",
+          priority: 50,
+          keywords: ["channel", "jump", channel.guildName],
+          run: ({ discord }) => discord.jumpToChannel(channel.id, channel.guildId)
+        }));
+        return [back, ...visibleChannels.length ? visibleChannels : storedChannels];
+      }
+      async showChannelsForGuild(guild) {
+        this.channelScope = { guildId: guild.id, name: guild.name, visibleChannels: [] };
+        this.query = "";
+        if (this.input) this.input.value = "";
+        this.updateResults();
+        this.registry.context.discord.jumpToGuild(guild.id);
+        await new Promise((resolve) => globalThis.setTimeout(resolve, 180));
+        if (!this.channelScope || this.channelScope.guildId !== guild.id) return;
+        this.channelScope.visibleChannels = this.registry.context.discord.getVisibleGuildTextChannels(guild);
+        this.updateResults();
+        requestAnimationFrame(() => this.input?.focus());
+      }
+      clearChannelScope() {
+        this.channelScope = null;
+        this.query = "";
+        if (this.input) this.input.value = "";
+        this.updateResults();
       }
     };
     function escapeHtml(value) {
@@ -738,27 +1015,127 @@ var require_palette = __commonJS({
   }
 });
 
+// src/settings.js
+var require_settings = __commonJS({
+  "src/settings.js"(exports2, module2) {
+    var PLUGIN_NAME = "CommandCenter";
+    var DEFAULTS = {
+      showNavigation: true,
+      showClipboard: true,
+      showServers: true,
+      showChannels: true,
+      showDirectMessages: true,
+      showDevelopment: false,
+      resultLimit: 12
+    };
+    var SettingsStore2 = class {
+      constructor({ onChange = () => {
+      } } = {}) {
+        this.onChange = onChange;
+        this.values = normalizeSettings(BdApi.Data.load(PLUGIN_NAME, "settings"));
+      }
+      get(key) {
+        return this.values[key];
+      }
+      set(key, value) {
+        this.values = normalizeSettings({ ...this.values, [key]: value });
+        BdApi.Data.save(PLUGIN_NAME, "settings", this.values);
+        this.onChange(this.values);
+      }
+    };
+    function normalizeSettings(raw) {
+      const values = raw && typeof raw === "object" ? raw : {};
+      return {
+        ...DEFAULTS,
+        ...Object.fromEntries(
+          Object.keys(DEFAULTS).filter((key) => key !== "resultLimit" && typeof values[key] === "boolean").map((key) => [key, values[key]])
+        ),
+        resultLimit: clampResultLimit(values.resultLimit)
+      };
+    }
+    function clampResultLimit(value) {
+      const numeric = Math.round(Number(value));
+      return Number.isFinite(numeric) ? Math.min(Math.max(numeric, 5), 30) : DEFAULTS.resultLimit;
+    }
+    module2.exports = { SettingsStore: SettingsStore2, DEFAULTS, normalizeSettings };
+  }
+});
+
+// src/settingsPanel.js
+var require_settingsPanel = __commonJS({
+  "src/settingsPanel.js"(exports2, module2) {
+    var OPTIONS = [
+      ["showNavigation", "Navigation", "Previous channel and other movement commands."],
+      ["showClipboard", "Clipboard", "Copy current location, channel links, and IDs."],
+      ["showServers", "Servers", "Jump to a server's first available text channel."],
+      ["showChannels", "Channels", "Search and jump to text channels."],
+      ["showDirectMessages", "Direct Messages", "Search and jump to your DMs."],
+      ["showDevelopment", "Development", "Show plugin information and reload guidance."]
+    ];
+    function createSettingsPanel2({ settings }) {
+      const root = document.createElement("div");
+      root.className = "cc-settings";
+      root.innerHTML = "<h2>Command Center</h2><p>Choose what appears in your command palette.</p>";
+      for (const [key, title, description] of OPTIONS) {
+        const row = document.createElement("label");
+        row.className = "cc-settings-row";
+        const checkbox = document.createElement("input");
+        checkbox.type = "checkbox";
+        checkbox.checked = settings.get(key);
+        checkbox.addEventListener("change", () => settings.set(key, checkbox.checked));
+        const text = document.createElement("span");
+        text.innerHTML = `<strong>${title}</strong><small>${description}</small>`;
+        row.append(checkbox, text);
+        root.append(row);
+      }
+      const limit = document.createElement("label");
+      limit.className = "cc-settings-limit";
+      limit.textContent = "Results shown at once";
+      const input = document.createElement("input");
+      input.type = "number";
+      input.min = "5";
+      input.max = "30";
+      input.value = String(settings.get("resultLimit"));
+      input.addEventListener("change", () => {
+        settings.set("resultLimit", input.value);
+        input.value = String(settings.get("resultLimit"));
+      });
+      limit.append(input);
+      root.append(limit);
+      return root;
+    }
+    module2.exports = { createSettingsPanel: createSettingsPanel2 };
+  }
+});
+
 // src/index.js
 var styles = require_styles();
 var { createDefaultCommands } = require_commandRegistry();
 var { DiscordBridge } = require_discordBridge();
 var { CommandPalette } = require_palette();
+var { SettingsStore } = require_settings();
+var { createSettingsPanel } = require_settingsPanel();
 var CommandCenter = class {
   constructor(meta) {
     this.meta = meta;
     this.discord = null;
     this.palette = null;
     this.registry = null;
+    this.settings = null;
     this.handleGlobalKeyDown = null;
   }
   start() {
     BdApi.DOM.addStyle(this.meta.name, styles);
+    this.settings = new SettingsStore({
+      onChange: () => this.palette?.updateResults()
+    });
     this.discord = new DiscordBridge({ notify: (message, options) => this.notify(message, options) });
     this.discord.start();
     const context = {
       meta: this.meta,
       notify: (message, options) => this.notify(message, options),
       discord: this.discord,
+      settings: this.settings,
       palette: null
     };
     this.registry = createDefaultCommands(context);
@@ -790,9 +1167,13 @@ var CommandCenter = class {
     this.palette?.destroy();
     this.palette = null;
     this.registry = null;
+    this.settings = null;
     this.discord?.stop();
     this.discord = null;
     BdApi.DOM.removeStyle(this.meta.name);
+  }
+  getSettingsPanel() {
+    return this.settings ? createSettingsPanel({ settings: this.settings }) : document.createElement("div");
   }
   notify(message, options = {}) {
     const type = options.type || "info";

@@ -7,8 +7,10 @@
     "build": "node scripts/build-selected.js all",
     "build:statustimer": "node scripts/build-selected.js StatusTimer",
     "build:commandcenter": "node scripts/build-selected.js CommandCenter",
-    "test": "npm --prefix plugins/StatusTimer test && npm --prefix plugins/CommandCenter test",
-    "sync:releases": "cp plugins/StatusTimer/dist/StatusTimer.plugin.js releases/StatusTimer.plugin.js && cp plugins/CommandCenter/dist/CommandCenter.plugin.js releases/CommandCenter.plugin.js"
+    "build:focusprofiles": "node scripts/build-selected.js FocusProfiles",
+    "build:statusdurations": "node scripts/build-selected.js StatusDurations",
+    "test": "npm --prefix plugins/StatusTimer test && npm --prefix plugins/CommandCenter test && npm --prefix plugins/FocusProfiles test && npm --prefix plugins/StatusDurations test",
+    "sync:releases": "cp plugins/StatusTimer/dist/StatusTimer.plugin.js releases/StatusTimer.plugin.js && cp plugins/CommandCenter/dist/CommandCenter.plugin.js releases/CommandCenter.plugin.js && cp plugins/FocusProfiles/dist/FocusProfiles.plugin.js releases/FocusProfiles.plugin.js && cp plugins/StatusDurations/dist/StatusDurations.plugin.js releases/StatusDurations.plugin.js"
   },
   "author": "ctrlcmdshft",
   "license": "MIT"

@@ -27,3 +27,12 @@ test("fuzzySearch searches title, subtitle, category, and keywords", () => {
   assert.equal(fuzzySearch("about", commands)[0].id, "a");
   assert.equal(fuzzySearch("clip", commands)[0].id, "b");
 });
+
+test("fuzzySearch uses command priority when browsing without a query", () => {
+  const commands = [
+    {id: "channels", title: "# general", category: "Channels", priority: 10},
+    {id: "previous", title: "Go to Previous Channel", category: "Navigation", priority: 100}
+  ];
+
+  assert.deepEqual(fuzzySearch("", commands).map((command) => command.id), ["previous", "channels"]);
+});

@@ -13,6 +13,7 @@ class CommandRegistry {
     this.commands.set(command.id, {
       category: "General",
       keywords: [],
+      priority: 0,
       ...command
     });
   }
@@ -38,13 +39,23 @@ class CommandRegistry {
       }
     });
 
-    return [...Array.from(this.commands.values()), ...providedCommands];
+    return [...Array.from(this.commands.values()), ...providedCommands]
+      .filter((command) => {
+        if (typeof command.enabled !== "function") return true;
+        try {
+          return command.enabled(this.context);
+        } catch (error) {
+          console.warn("[CommandCenter] command availability check failed", error);
+          return false;
+        }
+      });
   }
 
   async run(commandId) {
     const command = this.commands.get(commandId) || this.list().find((item) => item.id === commandId);
-    if (!command) return;
+    if (!command) return null;
     await command.run(this.context);
+    return command;
   }
 }
 
@@ -57,6 +68,7 @@ function createDefaultCommands(context) {
       title: "Close Command Center",
       subtitle: "Hide the palette",
       category: "Command Center",
+      priority: 10,
       keywords: ["escape", "dismiss"],
       run: ({palette}) => palette.close()
     },
@@ -65,6 +77,8 @@ function createDefaultCommands(context) {
       title: "Copy Current Discord Location",
       subtitle: "Copies the current Discord route or URL",
       category: "Clipboard",
+      priority: 70,
+      enabled: ({settings}) => settings.get("showClipboard"),
       keywords: ["copy", "url", "link", "channel"],
       run: async ({notify}) => {
         await copyText(window.location.href);
@@ -76,6 +90,8 @@ function createDefaultCommands(context) {
       title: "Show Command Center Version",
       subtitle: "Display the active plugin version",
       category: "Command Center",
+      priority: 20,
+      enabled: ({settings}) => settings.get("showDevelopment"),
       keywords: ["about", "info", "version"],
       run: ({meta, notify}) => notify(`${meta.name} ${meta.version}`)
     },
@@ -84,6 +100,8 @@ function createDefaultCommands(context) {
       title: "Reload BetterDiscord Plugin",
       subtitle: "Build again, then toggle the plugin in BetterDiscord",
       category: "Development",
+      priority: 20,
+      enabled: ({settings}) => settings.get("showDevelopment"),
       keywords: ["dev", "build", "reload", "test"],
       run: ({notify}) => notify("Build the plugin, then toggle CommandCenter off and on.")
     }
@@ -103,6 +121,8 @@ function createDiscordCommands({discord}) {
       title: "Go to Previous Channel",
       subtitle: "Jump back to the last channel Command Center saw",
       category: "Navigation",
+      priority: 100,
+      enabled: ({settings}) => settings.get("showNavigation"),
       keywords: ["back", "last", "previous", "channel"],
       run: ({discord}) => discord.jumpToPreviousChannel()
     }
@@ -116,6 +136,8 @@ function createDiscordCommands({discord}) {
         title: "Copy Current Channel Link",
         subtitle: channel?.name ? `# ${channel.name}` : "Copies a discord.com channel URL",
         category: "Clipboard",
+        priority: 90,
+        enabled: ({settings}) => settings.get("showClipboard"),
         keywords: ["copy", "link", "url", "current", "channel"],
         run: async ({discord, notify}) => {
           await copyText(discord.getChannelLink(selected.channelId, selected.guildId));
@@ -127,6 +149,8 @@ function createDiscordCommands({discord}) {
         title: "Copy Current Channel ID",
         subtitle: selected.channelId,
         category: "Clipboard",
+        priority: 80,
+        enabled: ({settings}) => settings.get("showClipboard"),
         keywords: ["copy", "snowflake", "id", "current", "channel"],
         run: async ({notify}) => {
           await copyText(selected.channelId);
@@ -140,13 +164,13 @@ function createDiscordCommands({discord}) {
     commands.push({
       id: `guild.${guild.id}`,
       title: guild.name,
-      subtitle: "Server",
+      subtitle: "Browse this server's channels",
       category: "Servers",
+      priority: 50,
+      enabled: ({settings}) => settings.get("showServers"),
       keywords: ["guild", "server", guild.name],
-      run: ({discord}) => {
-        const firstChannel = discord.getGuildTextChannels(guild)[0];
-        if (firstChannel) discord.jumpToChannel(firstChannel.id, guild.id);
-      }
+      keepOpen: true,
+      run: ({palette}) => palette.showChannelsForGuild(guild)
     });
   }
 
@@ -156,6 +180,9 @@ function createDiscordCommands({discord}) {
       title: channel.title,
       subtitle: channel.guildName,
       category: "Channels",
+      guildId: channel.guildId,
+      priority: 40,
+      enabled: ({settings}) => settings.get("showChannels"),
       keywords: ["jump", "goto", "channel", channel.guildName],
       run: ({discord}) => discord.jumpToChannel(channel.id, channel.guildId)
     });
@@ -167,8 +194,10 @@ function createDiscordCommands({discord}) {
       title: dm.title,
       subtitle: dm.guildName,
       category: "Direct Messages",
+      priority: 60,
+      enabled: ({settings}) => settings.get("showDirectMessages"),
       keywords: ["dm", "direct", "message", "jump", dm.title],
-      run: ({discord}) => discord.jumpToChannel(dm.id, "@me")
+      run: ({discord}) => discord.jumpToChannel(dm.id, "@me", dm.title)
     });
   }
 

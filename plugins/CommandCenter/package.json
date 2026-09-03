@@ -1,6 +1,6 @@
 {
   "name": "betterdiscord-command-center",
-  "version": "0.1.0",
+  "version": "0.3.3",
   "description": "Raycast-style command palette foundation for BetterDiscord.",
   "private": true,
   "main": "dist/CommandCenter.plugin.js",
@@ -14,7 +14,7 @@
     "plugin",
     "command-palette"
   ],
-  "author": "user",
+  "author": "ctrlcmdshft",
   "license": "MIT",
   "devDependencies": {
     "esbuild": "^0.28.2"

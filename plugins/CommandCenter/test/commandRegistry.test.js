@@ -16,6 +16,19 @@ test("CommandRegistry can list and run provider commands", async () => {
   ]);
 
   assert.equal(registry.list()[0].id, "dynamic.test");
-  await registry.run("dynamic.test");
+  const command = await registry.run("dynamic.test");
   assert.equal(didRun, true);
+  assert.equal(command.id, "dynamic.test");
+});
+
+test("CommandRegistry excludes commands disabled by settings", () => {
+  const registry = new CommandRegistry({settings: {get: () => false}});
+  registry.register({
+    id: "hidden.command",
+    title: "Hidden command",
+    enabled: ({settings}) => settings.get("showHidden"),
+    run: () => {}
+  });
+
+  assert.deepEqual(registry.list(), []);
 });

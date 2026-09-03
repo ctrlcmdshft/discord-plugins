@@ -12,9 +12,8 @@ on:
           - all
           - StatusTimer
           - CommandCenter
-  push:
-    branches:
-      - main
+          - FocusProfiles
+          - StatusDurations
 
 jobs:
   build:
@@ -30,12 +29,17 @@ jobs:
         with:
           node-version: 22
 
+      - name: Prepare release folder
+        run: |
+          rm -rf releases
+          mkdir releases
+
       - name: Build selected plugin
-        run: node scripts/build-selected.js "${{ github.event.inputs.plugin || 'all' }}"
+        run: node scripts/build-selected.js "${{ inputs.plugin }}"
 
       - name: Upload plugin artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: betterdiscord-plugins-${{ github.event.inputs.plugin || 'all' }}
+          name: betterdiscord-plugins-${{ inputs.plugin }}
           path: releases/*.plugin.js
           if-no-files-found: error
