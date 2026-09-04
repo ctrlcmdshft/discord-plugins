@@ -6,9 +6,10 @@ function normalize(value) {
   return {durations: durations.length === 5 ? durations : DEFAULTS};
 }
 class Settings {
-  constructor(onChange) { this.onChange = onChange; this.values = normalize(BdApi.Data.load(NAME, "settings")); }
+  constructor(onChange, data) { this.onChange = onChange; this.data = data || unboundData(); this.values = normalize(this.data.load("settings")); }
   get durations() { return this.values.durations; }
-  setDurations(value) { this.values = normalize({durations: value}); BdApi.Data.save(NAME, "settings", this.values); this.onChange?.(); }
+  setDurations(value) { this.values = normalize({durations: value}); this.data.save("settings", this.values); this.onChange?.(); }
 }
+function unboundData() { return {load:(key)=>BdApi.Data.load(NAME,key),save:(key,value)=>BdApi.Data.save(NAME,key,value),delete:(key)=>BdApi.Data.delete?.(NAME,key)}; }
 function parseDurations(text) { return String(text).split(/[\s,]+/).filter(Boolean).map(Number); }
 module.exports = {NAME, DEFAULTS, Settings, normalize, parseDurations};

@@ -4,11 +4,13 @@ const {Timer} = require("./timer");
 const {Menu} = require("./menu");
 
 class StatusDurations {
-  constructor(meta) { this.meta = meta; }
+  constructor(meta) { this.meta = meta; this.api = new BdApi("StatusDurations"); }
   start() {
-    this.settings = new Settings(() => this.menu?.refresh());
-    this.adapter = new StatusAdapter(); this.adapter.start();
-    this.timer = new Timer({adapter:this.adapter, notify:(message)=>BdApi.UI.showToast(message)}); this.timer.start();
+    this.settings = new Settings(() => this.menu?.refresh(), this.api.Data);
+    this.adapter = new StatusAdapter({webpack:this.api.Webpack, logger:this.api.Logger});
+    const health = this.adapter.start();
+    if (!health.available) this.api.Logger.warn("Discord status modules are unavailable", health);
+    this.timer = new Timer({adapter:this.adapter, data:this.api.Data, notify:(message)=>this.api.UI.showToast(message)}); this.timer.start();
     this.menu = new Menu({settings:this.settings,timer:this.timer}); this.menu.start();
   }
   stop() { this.menu?.stop(); this.timer?.stop(); this.adapter?.stop(); }
@@ -121,7 +123,7 @@ function parseDuration(value) {
 }
 function describe(minutes) { if (minutes < 60) return `${minutes} minute${minutes === 1 ? "" : "s"}`; if (minutes % 1440 === 0) return `${minutes / 1440} day${minutes === 1440 ? "" : "s"}`; if (minutes % 60 === 0) return `${minutes / 60} hour${minutes === 60 ? "" : "s"}`; return `${Math.floor(minutes / 60)}h ${minutes % 60}m`; }
 const styles = `.sd-root{max-width:740px;color:var(--text-normal);font-family:var(--font-primary)}.sd-section-title{margin:0 0 4px;color:var(--header-secondary);font-size:12px;font-weight:700;line-height:16px;letter-spacing:.02em;text-transform:uppercase}.sd-description,.sd-footnote{margin:0;color:var(--text-muted);font-size:13px;line-height:18px}.sd-settings{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));column-gap:24px;margin-top:12px;border-top:1px solid var(--background-modifier-accent)}.sd-duration-row{display:grid;grid-template-columns:76px minmax(0,1fr);align-items:center;gap:10px;min-height:50px;border-bottom:1px solid var(--background-modifier-accent)}.sd-setting-copy{display:grid;gap:2px}.sd-setting-title{color:var(--header-primary);font-size:14px;font-weight:500;line-height:18px}.sd-setting-note{color:var(--text-muted);font-size:13px;line-height:17px}.sd-input-group{display:grid;grid-template-columns:minmax(56px,82px) minmax(78px,1fr);gap:6px}.sd-duration-input,.sd-duration-unit{box-sizing:border-box;width:100%;height:34px;padding:6px 8px;border:0!important;border-radius:3px!important;background:var(--input-background)!important;color:var(--text-normal)!important;font:var(--font-primary)!important;font-size:14px!important}.sd-duration-input:focus,.sd-duration-unit:focus{outline:2px solid var(--brand-500);outline-offset:-2px}.sd-invalid .sd-duration-input,.sd-invalid .sd-duration-unit{outline:2px solid var(--status-danger);outline-offset:-2px}.sd-status{min-height:18px;padding-top:3px;color:var(--status-danger);font-size:12px;line-height:16px}.sd-presets-title{margin-top:16px}.sd-presets{display:grid;grid-template-columns:minmax(150px,1fr) auto;align-items:center;gap:20px;min-height:48px;border-bottom:1px solid var(--background-modifier-accent)}.sd-actions{display:flex;flex-wrap:wrap;justify-content:flex-end;gap:6px}.sd-preset{min-height:30px;border:0;border-radius:3px;padding:5px 10px;background:var(--button-secondary-background);color:var(--button-secondary-text);font:inherit;font-size:13px;font-weight:500;cursor:pointer}.sd-preset:hover{background:var(--button-secondary-background-hover,var(--background-modifier-hover))}.sd-footnote{margin-top:6px;font-size:12px;line-height:16px}@media(max-width:620px){.sd-settings{grid-template-columns:1fr}.sd-presets{grid-template-columns:1fr;gap:8px;padding:10px 0}.sd-actions{justify-content:flex-start}}`;
-const layoutStyles = `.sd-settings{grid-template-rows:repeat(3,50px);grid-auto-flow:column}@media(max-width:620px){.sd-settings{grid-template-rows:none;grid-auto-flow:row}}`;
+const layoutStyles = `.sd-settings{grid-template-rows:repeat(3,50px);grid-auto-flow:column}.sd-duration-input,.sd-duration-unit{border:1px solid transparent!important;background:var(--button-secondary-background,#2b2d31)!important;box-shadow:0 1px 1px rgba(0,0,0,.12)}.sd-duration-input:hover,.sd-duration-unit:hover{background:var(--button-secondary-background-hover,var(--background-modifier-hover))!important}.sd-duration-input:focus,.sd-duration-unit:focus{border-color:var(--brand-500)!important;box-shadow:0 0 0 1px var(--brand-500)}.sd-preset{border:1px solid var(--background-modifier-accent);background:var(--background-secondary-alt,var(--background-tertiary));box-shadow:0 1px 1px rgba(0,0,0,.12)}.sd-preset:hover{border-color:var(--interactive-muted);background:var(--background-modifier-hover)}@media(max-width:620px){.sd-settings{grid-template-rows:none;grid-auto-flow:row}}`;
 module.exports = StatusDurations;
 module.exports.parseDuration = parseDuration;
 module.exports.toEditorValue = toEditorValue;

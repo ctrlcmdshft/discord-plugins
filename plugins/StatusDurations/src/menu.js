@@ -7,7 +7,6 @@ class Menu {
     document.addEventListener("focusin", this.captureStatus, true);
     document.addEventListener("click", this.handleInteraction);
     document.addEventListener("keyup", this.handleInteraction, true);
-    this.clock = window.setInterval(() => this.updateActiveTimerLabels(), 1000);
     this.schedule();
   }
   stop() {
@@ -17,7 +16,7 @@ class Menu {
     document.removeEventListener("click", this.handleInteraction);
     document.removeEventListener("keyup", this.handleInteraction, true);
     window.clearTimeout(this.followup); this.followup = null;
-    window.clearInterval(this.clock); this.clock = null;
+    window.clearTimeout(this.clock); this.clock = null;
     for (const [node, binding] of this.boundItems) {
       node.removeEventListener("click", binding.listener, true);
       if (binding.textNode.isConnected && binding.textNode.textContent === binding.replacement) binding.textNode.textContent = binding.original;
@@ -73,6 +72,7 @@ class Menu {
     const visible = active?.expiresAt > Date.now() ? active : null;
     removeActiveTimerBadges();
     if (!visible) return;
+    let decorated = 0;
     for (const item of findStatusItems(document, visible.status)) {
       const note = document.createElement("div");
       note.className = "statusdurations-active-timer";
@@ -84,14 +84,24 @@ class Menu {
       item.style.position = "relative";
       item.style.paddingBottom = "22px";
       item.append(note);
+      decorated += 1;
     }
+    if (decorated) this.scheduleClock(visible.expiresAt);
+  }
+  scheduleClock(expiresAt) {
+    window.clearTimeout(this.clock);
+    const delay = nextCountdownDelay(expiresAt, Date.now());
+    if (delay !== null) this.clock = window.setTimeout(() => this.updateActiveTimerLabels(), delay);
   }
   updateActiveTimerLabels() {
     const active = this.timer.active();
-    if (!active?.expiresAt || active.expiresAt <= Date.now()) { this.schedule(); return; }
-    for (const node of document.querySelectorAll(".statusdurations-active-timer")) {
+    if (!active?.expiresAt || active.expiresAt <= Date.now()) { window.clearTimeout(this.clock); this.clock = null; this.schedule(); return; }
+    const badges = [...document.querySelectorAll(".statusdurations-active-timer")];
+    if (!badges.length) { window.clearTimeout(this.clock); this.clock = null; return; }
+    for (const node of badges) {
       if (Number(node.dataset.expiresAt) === active.expiresAt) node.textContent = countdownLabel(active.expiresAt);
     }
+    this.scheduleClock(active.expiresAt);
   }
 }
 function statusFromText(text) { if (text.includes("Do Not Disturb")) return "dnd"; if (text.includes("Invisible")) return "invisible"; if (text.includes("Idle")) return "idle"; return null; }
@@ -104,10 +114,11 @@ function getTimedDurationItems(menu) {
   // "For …" choices plus Forever. Matching the stable menu structure keeps
   // user-edited labels working after settings are changed.
   const timed = items.filter((node) => {
-    const text = String(node.textContent || "").replace(/\s+/g, " ").trim();
+    const text = normalizeText(node.textContent);
     return text.startsWith("For ") && text !== "Forever";
   });
-  return timed.length === 5 ? timed : [];
+  const hasForever = items.some((node) => normalizeText(node.textContent) === "Forever");
+  return timed.length === 5 && hasForever ? timed : [];
 }
 function normalizeText(text) { return String(text || "").replace(/\s+/g, " ").trim(); }
 function findStatusItems(root, status) {
@@ -150,5 +161,11 @@ function countdownLabel(expiresAt) {
   const minutes = totalMinutes % 60;
   return `Ends in ${hours}h ${minutes}m`;
 }
+function nextCountdownDelay(expiresAt, now) {
+  const remaining = expiresAt - now;
+  if (remaining <= 0) return null;
+  if (remaining <= 60_000) return Math.min(1000, remaining);
+  return Math.min(60_000, remaining % 60_000 || 60_000);
+}
 function close() { document.dispatchEvent(new KeyboardEvent("keydown",{key:"Escape",code:"Escape",bubbles:true})); }
-module.exports = {Menu, statusFromText, getTimedDurationItems, countdownLabel, findLabelTextNode, findStatusItems, normalizeText};
+module.exports = {Menu, statusFromText, getTimedDurationItems, countdownLabel, nextCountdownDelay, findLabelTextNode, findStatusItems, normalizeText};

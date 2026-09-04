@@ -1,7 +1,7 @@
 /**
  * @name StatusDurations
  * @author ctrlcmdshft
- * @version 1.0.20
+ * @version 1.1.0
  * @description Replace Discord's status duration choices with your own times.
  * @website https://github.com/ctrlcmdshft/discord-plugins
  * @source https://github.com/ctrlcmdshft/discord-plugins/tree/main/plugins/StatusDurations
@@ -27,19 +27,23 @@ var require_settings = __commonJS({
       return { durations: durations.length === 5 ? durations : DEFAULTS2 };
     }
     var Settings2 = class {
-      constructor(onChange) {
+      constructor(onChange, data) {
         this.onChange = onChange;
-        this.values = normalize(BdApi.Data.load(NAME, "settings"));
+        this.data = data || unboundData();
+        this.values = normalize(this.data.load("settings"));
       }
       get durations() {
         return this.values.durations;
       }
       setDurations(value) {
         this.values = normalize({ durations: value });
-        BdApi.Data.save(NAME, "settings", this.values);
+        this.data.save("settings", this.values);
         this.onChange?.();
       }
     };
+    function unboundData() {
+      return { load: (key) => BdApi.Data.load(NAME, key), save: (key, value) => BdApi.Data.save(NAME, key, value), delete: (key) => BdApi.Data.delete?.(NAME, key) };
+    }
     function parseDurations(text) {
       return String(text).split(/[\s,]+/).filter(Boolean).map(Number);
     }
@@ -51,38 +55,50 @@ var require_settings = __commonJS({
 var require_statusAdapter = __commonJS({
   "src/statusAdapter.js"(exports2, module2) {
     var StatusAdapter2 = class {
+      constructor({ webpack, logger } = {}) {
+        this.webpack = webpack || globalThis.BdApi?.Webpack;
+        this.logger = logger || globalThis.BdApi?.Logger || console;
+      }
       start() {
-        this.resolve();
+        return this.resolve();
       }
       resolve() {
-        this.store = BdApi.Webpack.getModule(
+        if (!this.webpack) return this.health();
+        this.store = this.webpack.getModule(
           (module3) => module3?.getName?.() === "UserSettingsProtoStore" || Boolean(module3?.settings?.status?.status),
-          { first: true, searchExports: true }
+          { first: true, searchExports: true, cacheId: "StatusDurations:status-store" }
         );
-        this.actions = BdApi.Webpack.getModule(
+        this.actions = this.webpack.getModule(
           (module3) => module3?.ProtoClass?.typeName?.endsWith(".PreloadedUserSettings"),
-          { first: true, searchExports: true }
-        ) || BdApi.Webpack.getByKeys("updateAsync", "getCurrentValue") || BdApi.Webpack.getByKeys("updateAsync");
+          { first: true, searchExports: true, cacheId: "StatusDurations:status-actions" }
+        ) || this.webpack.getByKeys("updateAsync", "getCurrentValue") || this.webpack.getByKeys("updateAsync");
+        return this.health();
       }
       stop() {
         this.store = null;
         this.actions = null;
+      }
+      health() {
+        const canRead = typeof this.store?.settings?.status?.status?.value === "string";
+        const canWrite = typeof this.actions?.updateAsync === "function";
+        return { available: canRead && canWrite, canRead, canWrite };
       }
       current() {
         const status = this.store?.settings?.status?.status?.value;
         return typeof status === "string" && status ? status : null;
       }
       set(status) {
+        if (!["online", "idle", "dnd", "invisible"].includes(status)) return false;
         if (!this.store?.settings?.status?.status || !this.actions?.updateAsync) this.resolve();
         if (!this.store?.settings?.status?.status || !this.actions?.updateAsync) return false;
         try {
           const result = this.actions.updateAsync("status", (data) => {
             data.status.value = status;
           }, 0);
-          result?.catch?.((error) => console.error("[StatusDurations] Failed to update status", error));
+          result?.catch?.((error) => this.logger.error("Failed to update status", error));
           return true;
         } catch (error) {
-          console.error("[StatusDurations] Failed to update status", error);
+          this.logger.error("Failed to update status", error);
           return false;
         }
       }
@@ -96,9 +112,11 @@ var require_timer = __commonJS({
   "src/timer.js"(exports2, module2) {
     var { NAME } = require_settings();
     var Timer2 = class {
-      constructor({ adapter, notify }) {
+      constructor({ adapter, notify, data, clock = window }) {
         this.adapter = adapter;
         this.notify = notify;
+        this.data = data || unboundData();
+        this.clock = clock;
         this.handle = null;
       }
       start() {
@@ -107,7 +125,7 @@ var require_timer = __commonJS({
         else if (active) this.finish(active);
       }
       stop() {
-        window.clearTimeout(this.handle);
+        this.clock.clearTimeout(this.handle);
         this.handle = null;
       }
       activate(status, minutes) {
@@ -117,31 +135,34 @@ var require_timer = __commonJS({
           return false;
         }
         const active = { status, previousStatus, activatedAt: Date.now(), expiresAt: Date.now() + minutes * 6e4 };
-        BdApi.Data.save(NAME, "active", active);
+        this.data.save("active", active);
         this.schedule(active.expiresAt);
         this.notify(`${label(status)} for ${format(minutes)}.`);
         return true;
       }
       active() {
-        const active = BdApi.Data.load(NAME, "active");
+        const active = this.data.load("active");
         if (!active) return null;
         if (shouldCancelForStatusChange(active, this.adapter.current(), Date.now())) {
           this.stop();
-          BdApi.Data.delete?.(NAME, "active");
+          this.data.delete?.("active");
           return null;
         }
         return active;
       }
       schedule(expiresAt) {
         this.stop();
-        this.handle = window.setTimeout(() => this.finish(), Math.max(0, expiresAt - Date.now()));
+        this.handle = this.clock.setTimeout(() => this.finish(), Math.max(0, expiresAt - Date.now()));
       }
       finish(saved = this.active()) {
         this.stop();
-        BdApi.Data.delete?.(NAME, "active");
+        this.data.delete?.("active");
         if (saved?.previousStatus && this.adapter.current() === saved.status) this.adapter.set(saved.previousStatus);
       }
     };
+    function unboundData() {
+      return { load: (key) => BdApi.Data.load(NAME, key), save: (key, value) => BdApi.Data.save(NAME, key, value), delete: (key) => BdApi.Data.delete?.(NAME, key) };
+    }
     function format(minutes) {
       if (minutes < 60) return `${minutes} minutes`;
       if (minutes % 1440 === 0) return `${minutes / 1440} day${minutes === 1440 ? "" : "s"}`;
@@ -179,7 +200,6 @@ var require_menu = __commonJS({
         document.addEventListener("focusin", this.captureStatus, true);
         document.addEventListener("click", this.handleInteraction);
         document.addEventListener("keyup", this.handleInteraction, true);
-        this.clock = window.setInterval(() => this.updateActiveTimerLabels(), 1e3);
         this.schedule();
       }
       stop() {
@@ -190,7 +210,7 @@ var require_menu = __commonJS({
         document.removeEventListener("keyup", this.handleInteraction, true);
         window.clearTimeout(this.followup);
         this.followup = null;
-        window.clearInterval(this.clock);
+        window.clearTimeout(this.clock);
         this.clock = null;
         for (const [node, binding] of this.boundItems) {
           node.removeEventListener("click", binding.listener, true);
@@ -261,6 +281,7 @@ var require_menu = __commonJS({
         const visible = active?.expiresAt > Date.now() ? active : null;
         removeActiveTimerBadges();
         if (!visible) return;
+        let decorated = 0;
         for (const item of findStatusItems(document, visible.status)) {
           const note = document.createElement("div");
           note.className = "statusdurations-active-timer";
@@ -272,17 +293,33 @@ var require_menu = __commonJS({
           item.style.position = "relative";
           item.style.paddingBottom = "22px";
           item.append(note);
+          decorated += 1;
         }
+        if (decorated) this.scheduleClock(visible.expiresAt);
+      }
+      scheduleClock(expiresAt) {
+        window.clearTimeout(this.clock);
+        const delay = nextCountdownDelay(expiresAt, Date.now());
+        if (delay !== null) this.clock = window.setTimeout(() => this.updateActiveTimerLabels(), delay);
       }
       updateActiveTimerLabels() {
         const active = this.timer.active();
         if (!active?.expiresAt || active.expiresAt <= Date.now()) {
+          window.clearTimeout(this.clock);
+          this.clock = null;
           this.schedule();
           return;
         }
-        for (const node of document.querySelectorAll(".statusdurations-active-timer")) {
+        const badges = [...document.querySelectorAll(".statusdurations-active-timer")];
+        if (!badges.length) {
+          window.clearTimeout(this.clock);
+          this.clock = null;
+          return;
+        }
+        for (const node of badges) {
           if (Number(node.dataset.expiresAt) === active.expiresAt) node.textContent = countdownLabel(active.expiresAt);
         }
+        this.scheduleClock(active.expiresAt);
       }
     };
     function statusFromText(text) {
@@ -297,10 +334,11 @@ var require_menu = __commonJS({
       const marked = items.filter((node) => node.dataset.statusdurationsBound);
       if (marked.length === 5) return marked;
       const timed = items.filter((node) => {
-        const text = String(node.textContent || "").replace(/\s+/g, " ").trim();
+        const text = normalizeText(node.textContent);
         return text.startsWith("For ") && text !== "Forever";
       });
-      return timed.length === 5 ? timed : [];
+      const hasForever = items.some((node) => normalizeText(node.textContent) === "Forever");
+      return timed.length === 5 && hasForever ? timed : [];
     }
     function normalizeText(text) {
       return String(text || "").replace(/\s+/g, " ").trim();
@@ -349,10 +387,16 @@ var require_menu = __commonJS({
       const minutes = totalMinutes % 60;
       return `Ends in ${hours}h ${minutes}m`;
     }
+    function nextCountdownDelay(expiresAt, now) {
+      const remaining = expiresAt - now;
+      if (remaining <= 0) return null;
+      if (remaining <= 6e4) return Math.min(1e3, remaining);
+      return Math.min(6e4, remaining % 6e4 || 6e4);
+    }
     function close() {
       document.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", code: "Escape", bubbles: true }));
     }
-    module2.exports = { Menu: Menu2, statusFromText, getTimedDurationItems, countdownLabel, findLabelTextNode, findStatusItems, normalizeText };
+    module2.exports = { Menu: Menu2, statusFromText, getTimedDurationItems, countdownLabel, nextCountdownDelay, findLabelTextNode, findStatusItems, normalizeText };
   }
 });
 
@@ -364,12 +408,14 @@ var { Menu } = require_menu();
 var StatusDurations = class {
   constructor(meta) {
     this.meta = meta;
+    this.api = new BdApi("StatusDurations");
   }
   start() {
-    this.settings = new Settings(() => this.menu?.refresh());
-    this.adapter = new StatusAdapter();
-    this.adapter.start();
-    this.timer = new Timer({ adapter: this.adapter, notify: (message) => BdApi.UI.showToast(message) });
+    this.settings = new Settings(() => this.menu?.refresh(), this.api.Data);
+    this.adapter = new StatusAdapter({ webpack: this.api.Webpack, logger: this.api.Logger });
+    const health = this.adapter.start();
+    if (!health.available) this.api.Logger.warn("Discord status modules are unavailable", health);
+    this.timer = new Timer({ adapter: this.adapter, data: this.api.Data, notify: (message) => this.api.UI.showToast(message) });
     this.timer.start();
     this.menu = new Menu({ settings: this.settings, timer: this.timer });
     this.menu.start();
@@ -496,7 +542,7 @@ function parseDuration(value) {
   return Math.round(matches.reduce((total, match) => total + Number(match[1]) * (match[2].startsWith("d") ? 1440 : match[2].startsWith("h") ? 60 : 1), 0));
 }
 var styles = `.sd-root{max-width:740px;color:var(--text-normal);font-family:var(--font-primary)}.sd-section-title{margin:0 0 4px;color:var(--header-secondary);font-size:12px;font-weight:700;line-height:16px;letter-spacing:.02em;text-transform:uppercase}.sd-description,.sd-footnote{margin:0;color:var(--text-muted);font-size:13px;line-height:18px}.sd-settings{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));column-gap:24px;margin-top:12px;border-top:1px solid var(--background-modifier-accent)}.sd-duration-row{display:grid;grid-template-columns:76px minmax(0,1fr);align-items:center;gap:10px;min-height:50px;border-bottom:1px solid var(--background-modifier-accent)}.sd-setting-copy{display:grid;gap:2px}.sd-setting-title{color:var(--header-primary);font-size:14px;font-weight:500;line-height:18px}.sd-setting-note{color:var(--text-muted);font-size:13px;line-height:17px}.sd-input-group{display:grid;grid-template-columns:minmax(56px,82px) minmax(78px,1fr);gap:6px}.sd-duration-input,.sd-duration-unit{box-sizing:border-box;width:100%;height:34px;padding:6px 8px;border:0!important;border-radius:3px!important;background:var(--input-background)!important;color:var(--text-normal)!important;font:var(--font-primary)!important;font-size:14px!important}.sd-duration-input:focus,.sd-duration-unit:focus{outline:2px solid var(--brand-500);outline-offset:-2px}.sd-invalid .sd-duration-input,.sd-invalid .sd-duration-unit{outline:2px solid var(--status-danger);outline-offset:-2px}.sd-status{min-height:18px;padding-top:3px;color:var(--status-danger);font-size:12px;line-height:16px}.sd-presets-title{margin-top:16px}.sd-presets{display:grid;grid-template-columns:minmax(150px,1fr) auto;align-items:center;gap:20px;min-height:48px;border-bottom:1px solid var(--background-modifier-accent)}.sd-actions{display:flex;flex-wrap:wrap;justify-content:flex-end;gap:6px}.sd-preset{min-height:30px;border:0;border-radius:3px;padding:5px 10px;background:var(--button-secondary-background);color:var(--button-secondary-text);font:inherit;font-size:13px;font-weight:500;cursor:pointer}.sd-preset:hover{background:var(--button-secondary-background-hover,var(--background-modifier-hover))}.sd-footnote{margin-top:6px;font-size:12px;line-height:16px}@media(max-width:620px){.sd-settings{grid-template-columns:1fr}.sd-presets{grid-template-columns:1fr;gap:8px;padding:10px 0}.sd-actions{justify-content:flex-start}}`;
-var layoutStyles = `.sd-settings{grid-template-rows:repeat(3,50px);grid-auto-flow:column}@media(max-width:620px){.sd-settings{grid-template-rows:none;grid-auto-flow:row}}`;
+var layoutStyles = `.sd-settings{grid-template-rows:repeat(3,50px);grid-auto-flow:column}.sd-duration-input,.sd-duration-unit{border:1px solid transparent!important;background:var(--button-secondary-background,#2b2d31)!important;box-shadow:0 1px 1px rgba(0,0,0,.12)}.sd-duration-input:hover,.sd-duration-unit:hover{background:var(--button-secondary-background-hover,var(--background-modifier-hover))!important}.sd-duration-input:focus,.sd-duration-unit:focus{border-color:var(--brand-500)!important;box-shadow:0 0 0 1px var(--brand-500)}.sd-preset{border:1px solid var(--background-modifier-accent);background:var(--background-secondary-alt,var(--background-tertiary));box-shadow:0 1px 1px rgba(0,0,0,.12)}.sd-preset:hover{border-color:var(--interactive-muted);background:var(--background-modifier-hover)}@media(max-width:620px){.sd-settings{grid-template-rows:none;grid-auto-flow:row}}`;
 module.exports = StatusDurations;
 module.exports.parseDuration = parseDuration;
 module.exports.toEditorValue = toEditorValue;

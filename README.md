@@ -2,6 +2,8 @@
 
 Private BetterDiscord plugin workspace for plugins created by ctrlcmdshft.
 
+The project is MIT licensed. See `CONTRIBUTING.md` for contribution expectations.
+
 ## Plugins
 
 - `plugins/StatusDurations` - Lightweight editable replacements for Discord's five status duration choices.

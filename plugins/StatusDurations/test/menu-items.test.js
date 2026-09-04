@@ -8,6 +8,11 @@ test("recognizes custom timed labels instead of only Discord defaults", () => {
   assert.equal(getTimedDurationItems(menu).length, 5);
 });
 
+test("rejects a five-item menu without Discord's Forever choice", () => {
+  const items = [5, 10, 15, 20, 25].map((minutes) => ({textContent: `For ${minutes} Minutes`, dataset: {}}));
+  assert.deepEqual(getTimedDurationItems({querySelectorAll: () => items}), []);
+});
+
 test("recognizes items already bound by the plugin", () => {
   const items = Array.from({length: 5}, (_, index) => ({textContent: `Custom ${index}`, dataset: {statusdurationsBound: "true"}}));
   assert.deepEqual(getTimedDurationItems({querySelectorAll: () => items}), items);
