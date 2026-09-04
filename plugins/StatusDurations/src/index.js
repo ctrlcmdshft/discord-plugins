@@ -45,6 +45,7 @@ function createSettingsPanel(settings) {
       return;
     }
     settings.setDurations(values);
+    renderValues(settings.durations);
     status.className = "sd-status";
     status.textContent = "";
   };

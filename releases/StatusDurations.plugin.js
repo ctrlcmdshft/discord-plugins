@@ -1,7 +1,7 @@
 /**
  * @name StatusDurations
  * @author ctrlcmdshft
- * @version 1.0.19
+ * @version 1.0.20
  * @description Replace Discord's status duration choices with your own times.
  * @website https://github.com/ctrlcmdshft/discord-plugins
  * @source https://github.com/ctrlcmdshft/discord-plugins/tree/main/plugins/StatusDurations
@@ -23,7 +23,7 @@ var require_settings = __commonJS({
     var DEFAULTS2 = [15, 60, 480, 1440, 4320];
     function normalize(value) {
       const values = Array.isArray(value?.durations) ? value.durations : DEFAULTS2;
-      const durations = [...new Set(values.map((item) => Math.round(Number(item))).filter((item) => Number.isFinite(item) && item > 0 && item <= 4320))].slice(0, 5);
+      const durations = [...new Set(values.map((item) => Math.round(Number(item))).filter((item) => Number.isFinite(item) && item > 0 && item <= 4320))].sort((a, b) => a - b).slice(0, 5);
       return { durations: durations.length === 5 ? durations : DEFAULTS2 };
     }
     var Settings2 = class {
@@ -409,6 +409,7 @@ function createSettingsPanel(settings) {
       return;
     }
     settings.setDurations(values);
+    renderValues(settings.durations);
     status.className = "sd-status";
     status.textContent = "";
   };

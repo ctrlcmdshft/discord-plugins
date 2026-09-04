@@ -2,7 +2,7 @@
   "name": "StatusDurations",
   "author": "ctrlcmdshft",
   "description": "Replace Discord's status duration choices with your own times.",
-  "version": "1.0.19",
+  "version": "1.0.20",
   "website": "https://github.com/ctrlcmdshft/discord-plugins",
   "source": "https://github.com/ctrlcmdshft/discord-plugins/tree/main/plugins/StatusDurations",
   "updateUrl": "https://raw.githubusercontent.com/ctrlcmdshft/discord-plugins/main/releases/StatusDurations.plugin.js"

@@ -2,7 +2,7 @@ const NAME = "StatusDurations";
 const DEFAULTS = [15, 60, 480, 1440, 4320];
 function normalize(value) {
   const values = Array.isArray(value?.durations) ? value.durations : DEFAULTS;
-  const durations = [...new Set(values.map((item) => Math.round(Number(item))).filter((item) => Number.isFinite(item) && item > 0 && item <= 4320))].slice(0, 5);
+  const durations = [...new Set(values.map((item) => Math.round(Number(item))).filter((item) => Number.isFinite(item) && item > 0 && item <= 4320))].sort((a, b) => a - b).slice(0, 5);
   return {durations: durations.length === 5 ? durations : DEFAULTS};
 }
 class Settings {
