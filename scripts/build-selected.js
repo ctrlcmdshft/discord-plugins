@@ -4,25 +4,13 @@ const {spawnSync} = require("node:child_process");
 
 const root = path.resolve(__dirname, "..");
 const plugins = {
-  StatusTimer: {
-    dir: path.join(root, "plugins", "StatusTimer"),
-    artifact: "StatusTimer.plugin.js"
-  },
-  CommandCenter: {
-    dir: path.join(root, "plugins", "CommandCenter"),
-    artifact: "CommandCenter.plugin.js"
-  },
-  FocusProfiles: {
-    dir: path.join(root, "plugins", "FocusProfiles"),
-    artifact: "FocusProfiles.plugin.js"
-  },
   StatusDurations: {
     dir: path.join(root, "plugins", "StatusDurations"),
     artifact: "StatusDurations.plugin.js"
   }
 };
 
-const selected = process.argv[2] || "all";
+const selected = process.argv[2] || "StatusDurations";
 const names = selected === "all" ? Object.keys(plugins) : [selected];
 
 for (const name of names) {

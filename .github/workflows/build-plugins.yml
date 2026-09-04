@@ -10,9 +10,6 @@ on:
         type: choice
         options:
           - all
-          - StatusTimer
-          - CommandCenter
-          - FocusProfiles
           - StatusDurations
 
 jobs:

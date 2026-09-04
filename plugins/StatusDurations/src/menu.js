@@ -1,9 +1,26 @@
 class Menu {
-  constructor({settings, timer}) { this.settings = settings; this.timer = timer; this.lastStatus = null; this.pending = false; this.boundItems = new Map(); this.over = this.over.bind(this); }
-  start() { this.observer = new MutationObserver(() => this.schedule()); this.observer.observe(document.body,{childList:true,subtree:true}); document.addEventListener("pointerover", this.over, true); this.clock = window.setInterval(() => this.updateActiveTimerLabels(), 1000); this.schedule(); }
+  constructor({settings, timer}) { this.settings = settings; this.timer = timer; this.lastStatus = null; this.pending = false; this.running = false; this.boundItems = new Map(); this.captureStatus = this.captureStatus.bind(this); }
+  start() {
+    if (this.running) return;
+    this.running = true;
+    this.observer = new MutationObserver(() => this.schedule());
+    this.observer.observe(document.body,{childList:true,subtree:true});
+    document.addEventListener("pointerover", this.captureStatus, true);
+    document.addEventListener("focusin", this.captureStatus, true);
+    this.clock = window.setInterval(() => this.updateActiveTimerLabels(), 1000);
+    this.schedule();
+  }
   stop() {
-    this.observer?.disconnect(); document.removeEventListener("pointerover", this.over, true); window.clearInterval(this.clock); this.clock = null;
-    for (const [node, listener] of this.boundItems) { node.removeEventListener("click", listener, true); if (node.dataset.statusdurationsLabel) node.textContent=node.dataset.statusdurationsLabel; delete node.dataset.statusdurationsLabel; }
+    this.running = false;
+    this.observer?.disconnect();
+    document.removeEventListener("pointerover", this.captureStatus, true);
+    document.removeEventListener("focusin", this.captureStatus, true);
+    window.clearInterval(this.clock); this.clock = null;
+    for (const [node, binding] of this.boundItems) {
+      node.removeEventListener("click", binding.listener, true);
+      if (binding.textNode.isConnected && binding.textNode.textContent === binding.replacement) binding.textNode.textContent = binding.original;
+      delete node.dataset.statusdurationsBound;
+    }
     for (const node of document.querySelectorAll(".statusdurations-active-timer")) {
       const item = node.parentElement;
       node.remove();
@@ -12,8 +29,12 @@ class Menu {
     this.boundItems.clear();
   }
   refresh() { this.stop(); this.start(); }
-  over(event) { const text = String(event.target?.closest?.('[role="menuitem"],button')?.textContent || ""); this.lastStatus = statusFromText(text) || this.lastStatus; }
-  schedule() { if (this.pending) return; this.pending=true; requestAnimationFrame(()=>{this.pending=false;this.inject();}); }
+  captureStatus(event) { const text = normalizeText(event.target?.closest?.('[role="menuitem"],button')?.textContent); this.lastStatus = statusFromText(text) || this.lastStatus; }
+  schedule() {
+    if (!this.running || this.pending) return;
+    this.pending=true;
+    requestAnimationFrame(()=>{this.pending=false;if (this.running) this.inject();});
+  }
   inject() {
     this.decorateActiveTimer();
     for (const menu of document.querySelectorAll('[role="menu"]')) {
@@ -25,11 +46,15 @@ class Menu {
   }
   replaceItem(node, minutes) {
     if (this.boundItems.has(node)) return;
-    node.dataset.statusdurationsLabel = node.textContent;
-    node.textContent = `For ${format(minutes)}`;
+    const replacement = `For ${format(minutes)}`;
+    const textNode = findLabelTextNode(node);
+    if (!textNode) return;
+    const original = textNode.textContent;
+    textNode.textContent = replacement;
+    node.dataset.statusdurationsBound = "true";
     const listener = (event) => { event.preventDefault(); event.stopImmediatePropagation(); event.stopPropagation(); this.timer.activate(this.lastStatus, minutes); close(); };
     node.addEventListener("click", listener, true);
-    this.boundItems.set(node, listener);
+    this.boundItems.set(node, {listener, textNode, original, replacement});
   }
   decorateActiveTimer() {
     const active = this.timer.active();
@@ -62,7 +87,7 @@ class Menu {
 function statusFromText(text) { if (text.includes("Do Not Disturb")) return "dnd"; if (text.includes("Invisible")) return "invisible"; if (text.includes("Idle")) return "idle"; return null; }
 function getTimedDurationItems(menu) {
   const items = [...menu.querySelectorAll('[role="menuitem"],button')];
-  const marked = items.filter((node) => node.dataset.statusdurationsLabel);
+  const marked = items.filter((node) => node.dataset.statusdurationsBound);
   if (marked.length === 5) return marked;
   // Discord's timed-status submenu is the only nearby menu with five
   // "For …" choices plus Forever. Matching the stable menu structure keeps
@@ -72,6 +97,16 @@ function getTimedDurationItems(menu) {
     return text.startsWith("For ") && text !== "Forever";
   });
   return timed.length === 5 ? timed : [];
+}
+function normalizeText(text) { return String(text || "").replace(/\s+/g, " ").trim(); }
+function findLabelTextNode(node) {
+  if (typeof document === "undefined" || !document.createTreeWalker) return null;
+  const walker = document.createTreeWalker(node, NodeFilter.SHOW_TEXT);
+  while (walker.nextNode()) {
+    const text = normalizeText(walker.currentNode.textContent);
+    if (text.startsWith("For ") && text !== "Forever") return walker.currentNode;
+  }
+  return null;
 }
 function format(minutes) { if (minutes < 60) return `${minutes} Minutes`; if (minutes % 1440 === 0) return `${minutes / 1440} Day${minutes === 1440 ? "" : "s"}`; if (minutes % 60 === 0) return `${minutes / 60} Hour${minutes === 60 ? "" : "s"}`; return `${Math.floor(minutes/60)}h ${minutes%60}m`; }
 function countdownLabel(expiresAt) {
@@ -85,4 +120,4 @@ function countdownLabel(expiresAt) {
   return `Ends in ${hours}h ${minutes}m`;
 }
 function close() { document.dispatchEvent(new KeyboardEvent("keydown",{key:"Escape",code:"Escape",bubbles:true})); }
-module.exports = {Menu, statusFromText, getTimedDurationItems, countdownLabel};
+module.exports = {Menu, statusFromText, getTimedDurationItems, countdownLabel, findLabelTextNode, normalizeText};
