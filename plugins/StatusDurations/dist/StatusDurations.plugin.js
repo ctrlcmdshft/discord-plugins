@@ -1,7 +1,7 @@
 /**
  * @name StatusDurations
  * @author ctrlcmdshft
- * @version 1.0.15
+ * @version 1.0.17
  * @description Replace Discord's status duration choices with your own times.
  * @website https://github.com/ctrlcmdshft/discord-plugins
  * @source https://github.com/ctrlcmdshft/discord-plugins/tree/main/plugins/StatusDurations
@@ -193,14 +193,7 @@ var require_menu = __commonJS({
           if (binding.textNode.isConnected && binding.textNode.textContent === binding.replacement) binding.textNode.textContent = binding.original;
           delete node.dataset.statusdurationsBound;
         }
-        for (const node of document.querySelectorAll(".statusdurations-active-timer")) {
-          const item = node.parentElement;
-          node.remove();
-          if (item?.dataset.statusdurationsPadding) {
-            item.style.paddingBottom = item.dataset.statusdurationsPadding;
-            delete item.dataset.statusdurationsPadding;
-          }
-        }
+        removeActiveTimerBadges();
         this.boundItems.clear();
       }
       refresh() {
@@ -208,7 +201,7 @@ var require_menu = __commonJS({
         this.start();
       }
       captureStatus(event) {
-        const text = normalizeText(event.target?.closest?.('[role="menuitem"],button')?.textContent);
+        const text = normalizeText(event.target?.closest?.(STATUS_ITEM_SELECTOR)?.textContent);
         this.lastStatus = statusFromText(text) || this.lastStatus;
       }
       schedule() {
@@ -249,19 +242,17 @@ var require_menu = __commonJS({
       decorateActiveTimer() {
         const active = this.timer.active();
         const visible = active?.expiresAt > Date.now() ? active : null;
-        for (const node of document.querySelectorAll(".statusdurations-active-timer")) node.remove();
+        removeActiveTimerBadges();
         if (!visible) return;
-        for (const menu of document.querySelectorAll('[role="menu"]')) {
-          const items = [...menu.querySelectorAll('[role="menuitem"],button')];
-          const item = items.find((node) => statusFromText(String(node.textContent || "")) === visible.status);
-          if (!item) continue;
+        for (const item of findStatusItems(document, visible.status)) {
           const note = document.createElement("div");
           note.className = "statusdurations-active-timer";
           note.dataset.expiresAt = String(visible.expiresAt);
           note.textContent = countdownLabel(visible.expiresAt);
           note.style.cssText = "position:absolute;left:40px;bottom:4px;padding:1px 6px;border-radius:999px;background:var(--background-modifier-hover);font-size:11px;line-height:15px;color:var(--text-muted);font-weight:600;white-space:nowrap;pointer-events:none;";
-          item.style.position = "relative";
           item.dataset.statusdurationsPadding = item.style.paddingBottom;
+          item.dataset.statusdurationsPosition = item.style.position;
+          item.style.position = "relative";
           item.style.paddingBottom = "22px";
           item.append(note);
         }
@@ -283,6 +274,7 @@ var require_menu = __commonJS({
       if (text.includes("Idle")) return "idle";
       return null;
     }
+    var STATUS_ITEM_SELECTOR = '[role^="menuitem"],[role="button"],button,[aria-haspopup="menu"]';
     function getTimedDurationItems(menu) {
       const items = [...menu.querySelectorAll('[role="menuitem"],button')];
       const marked = items.filter((node) => node.dataset.statusdurationsBound);
@@ -295,6 +287,25 @@ var require_menu = __commonJS({
     }
     function normalizeText(text) {
       return String(text || "").replace(/\s+/g, " ").trim();
+    }
+    function findStatusItems(root, status) {
+      const primary = [...root.querySelectorAll(STATUS_ITEM_SELECTOR)].filter((node) => statusFromText(normalizeText(node.textContent)) === status);
+      const fallback = [...root.querySelectorAll('[class*="item"]')].filter((node) => exactStatusFromText(normalizeText(node.textContent)) === status);
+      return [.../* @__PURE__ */ new Set([...primary, ...fallback])].filter((node) => !node.closest?.(".statusdurations-active-timer"));
+    }
+    function exactStatusFromText(text) {
+      return { Idle: "idle", "Do Not Disturb": "dnd", Invisible: "invisible" }[text] || null;
+    }
+    function removeActiveTimerBadges() {
+      for (const node of document.querySelectorAll(".statusdurations-active-timer")) {
+        const item = node.parentElement;
+        node.remove();
+        if (!item) continue;
+        item.style.paddingBottom = item.dataset.statusdurationsPadding || "";
+        item.style.position = item.dataset.statusdurationsPosition || "";
+        delete item.dataset.statusdurationsPadding;
+        delete item.dataset.statusdurationsPosition;
+      }
     }
     function findLabelTextNode(node) {
       if (typeof document === "undefined" || !document.createTreeWalker) return null;
@@ -324,7 +335,7 @@ var require_menu = __commonJS({
     function close() {
       document.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", code: "Escape", bubbles: true }));
     }
-    module2.exports = { Menu: Menu2, statusFromText, getTimedDurationItems, countdownLabel, findLabelTextNode, normalizeText };
+    module2.exports = { Menu: Menu2, statusFromText, getTimedDurationItems, countdownLabel, findLabelTextNode, findStatusItems, normalizeText };
   }
 });
 
