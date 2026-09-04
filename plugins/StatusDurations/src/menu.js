@@ -1,20 +1,22 @@
 class Menu {
-  constructor({settings, timer}) { this.settings = settings; this.timer = timer; this.lastStatus = null; this.pending = false; this.running = false; this.boundItems = new Map(); this.captureStatus = this.captureStatus.bind(this); }
+  constructor({settings, timer}) { this.settings = settings; this.timer = timer; this.lastStatus = null; this.pending = false; this.running = false; this.boundItems = new Map(); this.captureStatus = this.captureStatus.bind(this); this.handleInteraction = this.handleInteraction.bind(this); }
   start() {
     if (this.running) return;
     this.running = true;
-    this.observer = new MutationObserver(() => this.schedule());
-    this.observer.observe(document.body,{childList:true,subtree:true});
     document.addEventListener("pointerover", this.captureStatus, true);
     document.addEventListener("focusin", this.captureStatus, true);
+    document.addEventListener("click", this.handleInteraction);
+    document.addEventListener("keyup", this.handleInteraction, true);
     this.clock = window.setInterval(() => this.updateActiveTimerLabels(), 1000);
     this.schedule();
   }
   stop() {
     this.running = false;
-    this.observer?.disconnect();
     document.removeEventListener("pointerover", this.captureStatus, true);
     document.removeEventListener("focusin", this.captureStatus, true);
+    document.removeEventListener("click", this.handleInteraction);
+    document.removeEventListener("keyup", this.handleInteraction, true);
+    window.clearTimeout(this.followup); this.followup = null;
     window.clearInterval(this.clock); this.clock = null;
     for (const [node, binding] of this.boundItems) {
       node.removeEventListener("click", binding.listener, true);
@@ -25,13 +27,27 @@ class Menu {
     this.boundItems.clear();
   }
   refresh() { this.stop(); this.start(); }
-  captureStatus(event) { const text = normalizeText(event.target?.closest?.(STATUS_ITEM_SELECTOR)?.textContent); this.lastStatus = statusFromText(text) || this.lastStatus; }
+  captureStatus(event) {
+    const text = normalizeText(event.target?.closest?.(STATUS_ITEM_SELECTOR)?.textContent);
+    const status = statusFromText(text);
+    if (!status) return;
+    this.lastStatus = status;
+    this.schedule();
+    window.clearTimeout(this.followup);
+    this.followup = window.setTimeout(() => this.schedule(), 120);
+  }
+  handleInteraction() { this.schedule(); }
   schedule() {
     if (!this.running || this.pending) return;
     this.pending=true;
     requestAnimationFrame(()=>{this.pending=false;if (this.running) this.inject();});
   }
   inject() {
+    for (const [node, binding] of this.boundItems) {
+      if (node.isConnected) continue;
+      node.removeEventListener("click", binding.listener, true);
+      this.boundItems.delete(node);
+    }
     this.decorateActiveTimer();
     for (const menu of document.querySelectorAll('[role="menu"]')) {
       if (menu.querySelector(".awaytimer-native-menu-group")) continue;

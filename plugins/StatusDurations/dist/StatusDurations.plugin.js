@@ -1,7 +1,7 @@
 /**
  * @name StatusDurations
  * @author ctrlcmdshft
- * @version 1.0.17
+ * @version 1.0.19
  * @description Replace Discord's status duration choices with your own times.
  * @website https://github.com/ctrlcmdshft/discord-plugins
  * @source https://github.com/ctrlcmdshft/discord-plugins/tree/main/plugins/StatusDurations
@@ -170,22 +170,26 @@ var require_menu = __commonJS({
         this.running = false;
         this.boundItems = /* @__PURE__ */ new Map();
         this.captureStatus = this.captureStatus.bind(this);
+        this.handleInteraction = this.handleInteraction.bind(this);
       }
       start() {
         if (this.running) return;
         this.running = true;
-        this.observer = new MutationObserver(() => this.schedule());
-        this.observer.observe(document.body, { childList: true, subtree: true });
         document.addEventListener("pointerover", this.captureStatus, true);
         document.addEventListener("focusin", this.captureStatus, true);
+        document.addEventListener("click", this.handleInteraction);
+        document.addEventListener("keyup", this.handleInteraction, true);
         this.clock = window.setInterval(() => this.updateActiveTimerLabels(), 1e3);
         this.schedule();
       }
       stop() {
         this.running = false;
-        this.observer?.disconnect();
         document.removeEventListener("pointerover", this.captureStatus, true);
         document.removeEventListener("focusin", this.captureStatus, true);
+        document.removeEventListener("click", this.handleInteraction);
+        document.removeEventListener("keyup", this.handleInteraction, true);
+        window.clearTimeout(this.followup);
+        this.followup = null;
         window.clearInterval(this.clock);
         this.clock = null;
         for (const [node, binding] of this.boundItems) {
@@ -202,7 +206,15 @@ var require_menu = __commonJS({
       }
       captureStatus(event) {
         const text = normalizeText(event.target?.closest?.(STATUS_ITEM_SELECTOR)?.textContent);
-        this.lastStatus = statusFromText(text) || this.lastStatus;
+        const status = statusFromText(text);
+        if (!status) return;
+        this.lastStatus = status;
+        this.schedule();
+        window.clearTimeout(this.followup);
+        this.followup = window.setTimeout(() => this.schedule(), 120);
+      }
+      handleInteraction() {
+        this.schedule();
       }
       schedule() {
         if (!this.running || this.pending) return;
@@ -213,6 +225,11 @@ var require_menu = __commonJS({
         });
       }
       inject() {
+        for (const [node, binding] of this.boundItems) {
+          if (node.isConnected) continue;
+          node.removeEventListener("click", binding.listener, true);
+          this.boundItems.delete(node);
+        }
         this.decorateActiveTimer();
         for (const menu of document.querySelectorAll('[role="menu"]')) {
           if (menu.querySelector(".awaytimer-native-menu-group")) continue;
@@ -370,7 +387,7 @@ var PRESETS = { short: [5, 15, 30, 60, 120], work: [15, 30, 60, 120, 480], defau
 function createSettingsPanel(settings) {
   const root = element("div", "sd-root");
   const style = document.createElement("style");
-  style.textContent = styles;
+  style.textContent = `${styles}${layoutStyles}`;
   root.append(style);
   const panel = element("div", "sd-panel");
   panel.append(element("h3", "sd-section-title", "Duration options"), element("p", "sd-description", "Set the five duration choices shown for Idle, Do Not Disturb, and Invisible."));
@@ -478,6 +495,7 @@ function parseDuration(value) {
   return Math.round(matches.reduce((total, match) => total + Number(match[1]) * (match[2].startsWith("d") ? 1440 : match[2].startsWith("h") ? 60 : 1), 0));
 }
 var styles = `.sd-root{max-width:740px;color:var(--text-normal);font-family:var(--font-primary)}.sd-section-title{margin:0 0 4px;color:var(--header-secondary);font-size:12px;font-weight:700;line-height:16px;letter-spacing:.02em;text-transform:uppercase}.sd-description,.sd-footnote{margin:0;color:var(--text-muted);font-size:13px;line-height:18px}.sd-settings{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));column-gap:24px;margin-top:12px;border-top:1px solid var(--background-modifier-accent)}.sd-duration-row{display:grid;grid-template-columns:76px minmax(0,1fr);align-items:center;gap:10px;min-height:50px;border-bottom:1px solid var(--background-modifier-accent)}.sd-setting-copy{display:grid;gap:2px}.sd-setting-title{color:var(--header-primary);font-size:14px;font-weight:500;line-height:18px}.sd-setting-note{color:var(--text-muted);font-size:13px;line-height:17px}.sd-input-group{display:grid;grid-template-columns:minmax(56px,82px) minmax(78px,1fr);gap:6px}.sd-duration-input,.sd-duration-unit{box-sizing:border-box;width:100%;height:34px;padding:6px 8px;border:0!important;border-radius:3px!important;background:var(--input-background)!important;color:var(--text-normal)!important;font:var(--font-primary)!important;font-size:14px!important}.sd-duration-input:focus,.sd-duration-unit:focus{outline:2px solid var(--brand-500);outline-offset:-2px}.sd-invalid .sd-duration-input,.sd-invalid .sd-duration-unit{outline:2px solid var(--status-danger);outline-offset:-2px}.sd-status{min-height:18px;padding-top:3px;color:var(--status-danger);font-size:12px;line-height:16px}.sd-presets-title{margin-top:16px}.sd-presets{display:grid;grid-template-columns:minmax(150px,1fr) auto;align-items:center;gap:20px;min-height:48px;border-bottom:1px solid var(--background-modifier-accent)}.sd-actions{display:flex;flex-wrap:wrap;justify-content:flex-end;gap:6px}.sd-preset{min-height:30px;border:0;border-radius:3px;padding:5px 10px;background:var(--button-secondary-background);color:var(--button-secondary-text);font:inherit;font-size:13px;font-weight:500;cursor:pointer}.sd-preset:hover{background:var(--button-secondary-background-hover,var(--background-modifier-hover))}.sd-footnote{margin-top:6px;font-size:12px;line-height:16px}@media(max-width:620px){.sd-settings{grid-template-columns:1fr}.sd-presets{grid-template-columns:1fr;gap:8px;padding:10px 0}.sd-actions{justify-content:flex-start}}`;
+var layoutStyles = `.sd-settings{grid-template-rows:repeat(3,50px);grid-auto-flow:column}@media(max-width:620px){.sd-settings{grid-template-rows:none;grid-auto-flow:row}}`;
 module.exports = StatusDurations;
 module.exports.parseDuration = parseDuration;
 module.exports.toEditorValue = toEditorValue;
