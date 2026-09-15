@@ -1,6 +1,6 @@
 # Discord Plugins
 
-Private BetterDiscord plugin workspace for plugins created by ctrlcmdshft.
+BetterDiscord plugin workspace for StatusDurations by ctrlcmdshft.
 
 The project is MIT licensed. See `CONTRIBUTING.md` for contribution expectations.
 
@@ -42,9 +42,4 @@ cp releases/StatusDurations.plugin.js "$HOME/Library/Application Support/BetterD
 
 ## GitHub Actions
 
-Use the `Build Plugins` workflow from GitHub's Actions tab. It runs manually only, and the run form lets you choose:
-
-- `all`
-- `StatusDurations`
-
-The workflow uploads only the `.plugin.js` file or files selected for that run as artifacts.
+Use the `Build Plugins` workflow from GitHub's Actions tab. It runs manually and uploads `StatusDurations.plugin.js` as an artifact.

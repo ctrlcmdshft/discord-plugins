@@ -2,10 +2,10 @@
   "name": "discord-plugins",
   "version": "0.1.0",
   "private": true,
-  "description": "Private BetterDiscord plugin workspace.",
+  "description": "BetterDiscord plugin workspace for StatusDurations.",
   "scripts": {
-    "build": "node scripts/build-selected.js StatusDurations",
-    "build:statusdurations": "node scripts/build-selected.js StatusDurations",
+    "build": "env -u npm_config_allow_scripts npm --prefix plugins/StatusDurations ci --ignore-scripts && npm --prefix plugins/StatusDurations test && npm --prefix plugins/StatusDurations run build && npm run sync:releases",
+    "build:statusdurations": "npm run build",
     "test": "npm --prefix plugins/StatusDurations test",
     "sync:releases": "cp plugins/StatusDurations/dist/StatusDurations.plugin.js releases/StatusDurations.plugin.js"
   },

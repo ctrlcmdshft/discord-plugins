@@ -2,19 +2,10 @@ name: Build Plugins
 
 on:
   workflow_dispatch:
-    inputs:
-      plugin:
-        description: Plugin to build
-        required: true
-        default: all
-        type: choice
-        options:
-          - all
-          - StatusDurations
 
 jobs:
   build:
-    name: Build ${{ github.event.inputs.plugin || 'all' }}
+    name: Build StatusDurations
     runs-on: ubuntu-latest
 
     steps:
@@ -32,11 +23,11 @@ jobs:
           mkdir releases
 
       - name: Build selected plugin
-        run: node scripts/build-selected.js "${{ inputs.plugin }}"
+        run: npm run build
 
       - name: Upload plugin artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: betterdiscord-plugins-${{ inputs.plugin }}
+          name: StatusDurations
           path: releases/*.plugin.js
           if-no-files-found: error
